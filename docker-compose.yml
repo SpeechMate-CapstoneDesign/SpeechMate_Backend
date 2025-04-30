@@ -1,0 +1,38 @@
+services:
+  server:
+    image: s13121312/capstoneback:latest
+    ports:
+      - "8080:8080"
+    depends_on:
+      my-db:
+        condition: service_healthy
+      my-cache-server:
+        condition: service_healthy
+    restart: always
+
+  my-db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: capstone1234!
+      MYSQL_DATABASE: capstonedb
+    volumes:
+      - ./mysql_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: always
+
+  my-cache-server:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: always

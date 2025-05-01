@@ -1,0 +1,26 @@
+spring:
+  datasource:
+    url: jdbc:mysql://my-db:3306/capstonedb
+    username: root
+    password: capstone1234!
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+  data:
+    redis:
+      host: my-cache-server
+      port: 6379
+cloud:
+  aws:
+    credentials:
+      access-key: AKIAQGYBPSVMNHW2LG4C
+      secret-key: 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
+    s3:
+      bucket: s3-springtest # bucket 이름을 설정한다.
+      base-url: voice
+    region:
+      static: ap-northeast-2 # bucket이 위치한 AWS 리전을 설정한다.
+    stack:
+      auto: false # 자동 스택 생성 기능 사용여부를 설정한다. (자동 스택 생성: 애플리케이션이 실행, 배포될 때 인프라 리소스를 자동으로 생성하고 설정하는 것)
+

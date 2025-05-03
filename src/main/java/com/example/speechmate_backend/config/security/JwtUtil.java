@@ -38,7 +38,7 @@ public class JwtUtil {
                     .getSubject();
             return Long.parseLong(subject);
         } catch (JwtException e) {
-            throw InvalidTokenException.EXEPTION;
+            throw InvalidTokenException.EXCEPTION;
         }
     }
 
@@ -55,7 +55,7 @@ public class JwtUtil {
                     .getPayload();
             return claims.getExpiration().getTime();
         } catch (JwtException e) {
-            throw InvalidTokenException.EXEPTION;
+            throw InvalidTokenException.EXCEPTION;
         }
     }
 

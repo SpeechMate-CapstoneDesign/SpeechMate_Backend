@@ -6,7 +6,7 @@ import lombok.Getter;
 
 @AllArgsConstructor
 @Getter
-public class SmateExeption extends RuntimeException {
+public class SmateException extends RuntimeException {
     private ErrorCodeIfs error;
 
     public ErrorCodeIfs getError() {

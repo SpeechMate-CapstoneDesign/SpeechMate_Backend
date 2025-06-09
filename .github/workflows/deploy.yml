@@ -58,6 +58,11 @@ jobs:
           key: ${{ secrets.EC2_PRIVATE_KEY }}
           script: |
             cd /home/ubuntu/capstone
-            docker compose down
+            
+            echo "🧹 Cleaning up existing containers and volumes..."
+            docker compose down -v || true
+            docker container prune -f || true
+            docker volume prune -f || true
+
             docker compose pull
             docker compose up -d

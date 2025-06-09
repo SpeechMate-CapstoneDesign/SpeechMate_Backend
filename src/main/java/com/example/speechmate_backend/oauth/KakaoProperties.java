@@ -18,8 +18,13 @@ public class KakaoProperties {
     @Getter
     @Setter
     public static class OauthSecret {
+        private String redirectUrI;
         private String baseUrl;
         private String appKey;
+    }
+
+    public String getKakaoRedirectUrI() {
+        return kakao.getRedirectUrI();
     }
 
     public String getKakaoBaseUrl() {

@@ -1,7 +1,6 @@
 package com.example.speechmate_backend.common.exception;
 
 import com.example.speechmate_backend.common.ApiResponse;
-import com.example.speechmate_backend.common.error.ErrorCode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;

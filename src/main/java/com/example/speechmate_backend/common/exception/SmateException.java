@@ -4,8 +4,8 @@ import com.example.speechmate_backend.common.error.ErrorCodeIfs;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
-@AllArgsConstructor
 @Getter
+@AllArgsConstructor
 public class SmateException extends RuntimeException {
     private ErrorCodeIfs error;
 

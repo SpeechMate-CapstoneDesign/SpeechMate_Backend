@@ -25,8 +25,8 @@ public class SecurityConfig {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .sessionManagement((session) -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests((auth) -> auth
-                        .requestMatchers("/**").permitAll())
-                        //.anyRequest().authenticated())
+                        .requestMatchers("/api/auth/**").permitAll()
+                        .anyRequest().authenticated())
                 .addFilterBefore(new JwtFIlter(jwtUtil), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

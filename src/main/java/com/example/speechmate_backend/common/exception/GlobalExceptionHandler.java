@@ -63,7 +63,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
 
     @ExceptionHandler(SmateException.class)
-    public ResponseEntity<ApiResponse<String>> handlePopcornException(SmateException ex) {
+    public ResponseEntity<ApiResponse<String>> handleSmateException(SmateException ex) {
         return ResponseEntity.status(ex.getError().getResultCode())
                 .body(ApiResponse.fail(ex.getError()));
     }

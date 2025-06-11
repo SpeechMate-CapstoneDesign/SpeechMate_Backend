@@ -1,4 +1,4 @@
-package com.example.speechmate_backend.domain;
+package com.example.speechmate_backend.common;
 
 import jakarta.persistence.EntityListeners;
 import jakarta.persistence.MappedSuperclass;

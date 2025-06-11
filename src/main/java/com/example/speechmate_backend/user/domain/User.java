@@ -1,5 +1,6 @@
-package com.example.speechmate_backend.domain;
+package com.example.speechmate_backend.user.domain;
 
+import com.example.speechmate_backend.common.BaseEntity;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;

@@ -12,9 +12,11 @@ import com.example.speechmate_backend.user.domain.User;
 import com.example.speechmate_backend.user.repository.UserRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @RequiredArgsConstructor
 @Service
 public class SpeechService {
@@ -41,10 +43,12 @@ public class SpeechService {
         // 1. Speech 객체 저장 (content, audioFileUrl은 아직 null)
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> UserNotFoundException.EXCEPTION);
-
+        log.info("userID: " + userId);
         Speech speech = new Speech();
-        speech.setUser(user);
-        speechRepository.save(speech); // 이 시점에 speechId 생성
+
+        user.addSpeech(speech);
+        speechRepository.save(speech);// 이 시점에 speechId 생성
+        log.info("speechId: " + speech.getId());
 
         // 2. Presigned URL 발급
         VoiceRecordDto dto = s3UploadPresignedUrlService.generatePreSignedUrlForSpeech(userId, speech.getId(), fileExtension);

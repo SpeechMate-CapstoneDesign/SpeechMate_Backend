@@ -7,7 +7,8 @@ public enum MediaFileExtension {
     WAV("audio/wave"),
     MP3("audio/mpeg"),
     MP4("video/mp4"),
-    MOV("video/quicktime");
+    MOV("video/quicktime"),
+    M4A("audio/mp4");
 
     private final String mimeType;
 

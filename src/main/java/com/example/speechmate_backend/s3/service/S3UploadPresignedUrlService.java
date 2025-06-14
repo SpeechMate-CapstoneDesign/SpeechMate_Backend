@@ -68,7 +68,7 @@ public class S3UploadPresignedUrlService {
             case "mp3" -> "audio/mpeg";
             case "wav", "wave" -> "audio/wave";
             case "webm" -> "audio/webm";
-            case "mp4" -> "video/mp4";
+            case "m4a", "mp4" -> "audio/mp4";
             default -> "application/octet-stream";
         };
     }

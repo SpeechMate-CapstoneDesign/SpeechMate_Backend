@@ -12,6 +12,8 @@ public enum ErrorCode implements ErrorCodeIfs{
     TOKEN_EXPIRED("fail", HttpStatus.SC_BAD_REQUEST, "만료된 토큰"),
     OAUTH_PROVIDER_NOT_MATCH("fail", HttpStatus.SC_BAD_REQUEST, "provider가 올바르지 않음"),
     USER_ALREADY_EXIST_INFO("fail", HttpStatus.SC_BAD_REQUEST, "이미 존재하는 Oauth 정보"),
+    SPEECH_NOT_FOUND("fail", HttpStatus.SC_NOT_FOUND, "존재하지 않는 스피치"),
+    USER_NOT_FOUND("fail", HttpStatus.SC_NOT_FOUND, "존재하지 않는 유저"),
     ;
 
 

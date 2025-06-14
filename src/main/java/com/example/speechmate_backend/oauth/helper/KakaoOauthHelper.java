@@ -1,7 +1,7 @@
 package com.example.speechmate_backend.oauth.helper;
 
-import com.example.speechmate_backend.domain.OauthInfo;
-import com.example.speechmate_backend.domain.OauthProvider;
+import com.example.speechmate_backend.user.domain.OauthInfo;
+import com.example.speechmate_backend.user.domain.OauthProvider;
 import com.example.speechmate_backend.oauth.KakaoProperties;
 import com.example.speechmate_backend.oauth.client.KakaoOauthClient;
 import com.example.speechmate_backend.oauth.dto.OIDCDecodePayload;

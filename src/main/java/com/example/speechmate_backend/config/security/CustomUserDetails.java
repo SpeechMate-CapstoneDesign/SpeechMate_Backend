@@ -12,13 +12,17 @@ import java.util.Collections;
 @Getter
 public class CustomUserDetails implements UserDetails {
 
-    private String userId;
+    private Long userId;
     /*
     * 권한 사용 X
     * */
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return Collections.emptyList();
+    }
+
+    public Long getUserId() {
+        return userId;
     }
 
     @Override
@@ -28,7 +32,7 @@ public class CustomUserDetails implements UserDetails {
 
     @Override
     public String getUsername() {
-        return userId;
+        return null;
     }
 
     @Override

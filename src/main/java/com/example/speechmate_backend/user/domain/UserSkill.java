@@ -1,4 +1,4 @@
-package com.example.speechmate_backend.domain;
+package com.example.speechmate_backend.user.domain;
 
 import jakarta.persistence.*;
 import lombok.AccessLevel;

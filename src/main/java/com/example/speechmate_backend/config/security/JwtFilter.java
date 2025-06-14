@@ -94,7 +94,7 @@ public class JwtFilter extends OncePerRequestFilter {
         Long userId = jwtUtil.getUserId(accessToken);
         log.debug("토큰 유효, userId: {}", userId);
 
-        CustomUserDetails customUserDetails = new CustomUserDetails(userId.toString());
+        CustomUserDetails customUserDetails = new CustomUserDetails(userId);
 
         Authentication authToken = new UsernamePasswordAuthenticationToken(customUserDetails, null, customUserDetails.getAuthorities());
         SecurityContextHolder.getContext().setAuthentication(authToken);

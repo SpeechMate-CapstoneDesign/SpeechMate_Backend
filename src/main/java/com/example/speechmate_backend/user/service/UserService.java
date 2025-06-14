@@ -1,13 +1,13 @@
-package com.example.speechmate_backend.service;
+package com.example.speechmate_backend.user.service;
 
 import com.example.speechmate_backend.common.exception.UserAlreadyExistException;
 import com.example.speechmate_backend.config.redis.RedisUtil;
 import com.example.speechmate_backend.config.security.JwtUtil;
-import com.example.speechmate_backend.domain.OauthInfo;
-import com.example.speechmate_backend.domain.User;
-import com.example.speechmate_backend.domain.UserSkill;
-import com.example.speechmate_backend.domain.repository.UserRepository;
-import com.example.speechmate_backend.domain.repository.UserSkillRepository;
+import com.example.speechmate_backend.user.domain.OauthInfo;
+import com.example.speechmate_backend.user.domain.User;
+import com.example.speechmate_backend.user.domain.UserSkill;
+import com.example.speechmate_backend.user.repository.UserRepository;
+import com.example.speechmate_backend.user.repository.UserSkillRepository;
 import com.example.speechmate_backend.oauth.dto.AfterOauthSignupDto;
 import com.example.speechmate_backend.oauth.dto.OauthLoginResponse;
 import com.example.speechmate_backend.oauth.helper.KakaoOauthHelper;
@@ -16,7 +16,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 @Service

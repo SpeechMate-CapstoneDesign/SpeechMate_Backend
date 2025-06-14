@@ -1,14 +1,14 @@
-package com.example.speechmate_backend.controller;
+package com.example.speechmate_backend.user.controller;
 
 import com.example.speechmate_backend.common.ApiResponse;
 import com.example.speechmate_backend.common.exception.InvalidOauthProviderException;
-import com.example.speechmate_backend.domain.OauthInfo;
+import com.example.speechmate_backend.user.domain.OauthInfo;
 import com.example.speechmate_backend.oauth.KakaoProperties;
 import com.example.speechmate_backend.oauth.dto.AfterOauthSignupDto;
 import com.example.speechmate_backend.oauth.dto.OauthLoginRequest;
 import com.example.speechmate_backend.oauth.dto.OauthLoginResponse;
 import com.example.speechmate_backend.oauth.helper.KakaoOauthHelper;
-import com.example.speechmate_backend.service.UserService;
+import com.example.speechmate_backend.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;

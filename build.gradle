@@ -21,6 +21,13 @@ configurations {
 
 repositories {
     mavenCentral()
+
+    maven { url "https://repo.spring.io/milestone" }
+    maven { url 'https://repo.spring.io/snapshot' }
+    maven {
+        name = 'Central Portal Snapshots'
+        url = 'https://central.sonatype.com/repository/maven-snapshots/'
+    }
 }
 
 ext {
@@ -54,6 +61,15 @@ dependencies {
     runtimeOnly 'com.mysql:mysql-connector-j'
 
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
+    implementation platform("org.springframework.ai:spring-ai-bom:1.0.0")
+    // Replace the following with the starter dependencies of specific modules you wish to use
+    implementation 'org.springframework.ai:spring-ai-openai'
+    implementation 'org.springframework.ai:spring-ai-starter-model-openai'
+    implementation 'org.apache.httpcomponents.client5:httpclient5:5.2.1'
+
+
+    // spring ai
 }
 
 dependencyManagement {

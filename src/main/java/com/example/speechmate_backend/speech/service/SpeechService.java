@@ -5,7 +5,9 @@ import com.example.speechmate_backend.common.exception.UserNotFoundException;
 import com.example.speechmate_backend.s3.MediaFileExtension;
 import com.example.speechmate_backend.s3.controller.dto.VoiceRecordDto;
 import com.example.speechmate_backend.s3.service.S3UploadPresignedUrlService;
+import com.example.speechmate_backend.speech.controller.dto.AnalysisResultDto;
 import com.example.speechmate_backend.speech.controller.dto.SpeechContentRequest;
+import com.example.speechmate_backend.speech.domain.AnalysisResult;
 import com.example.speechmate_backend.speech.domain.Speech;
 import com.example.speechmate_backend.speech.repository.SpeechRepository;
 import com.example.speechmate_backend.user.domain.User;
@@ -24,17 +26,21 @@ public class SpeechService {
     private final UserRepository userRepository;
     private final S3UploadPresignedUrlService s3UploadPresignedUrlService;
     private final SpeechRepository speechRepository;
+    private final SpeechAnalysisResultService speechAnalysisResultService;
 
 
     @Transactional
     public void getContent(Long speechId, @Valid SpeechContentRequest request) {
         Speech speech = speechRepository.findById(speechId)
                 .orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
-
+        String originalContent = request.content();
+        log.info("Speech ID {}에 대한 텍스트 분석을 시작합니다.", speechId);
+        AnalysisResult analysisResult = speechAnalysisResultService.analyzeText(originalContent);
+        log.info("텍스트 분석 완료. 논리 점수: {}", analysisResult.getLogicalCoherenceScore());
+        speech.setAnalysisResult(analysisResult);
         speech.setContent(request.content());
         speechRepository.save(speech);
 
-        return ;
 
     }
 

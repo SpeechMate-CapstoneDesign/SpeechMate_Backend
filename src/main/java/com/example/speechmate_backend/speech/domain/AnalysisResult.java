@@ -1,8 +1,20 @@
 package com.example.speechmate_backend.speech.domain;
 
+import com.example.speechmate_backend.speech.controller.dto.AnalysisResultDto;
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
+import java.util.ArrayList;
+import java.util.List;
+
+@Getter
+@Builder
 @Entity
+@NoArgsConstructor
+@AllArgsConstructor
 public class AnalysisResult {
 
 
@@ -19,18 +31,36 @@ public class AnalysisResult {
     @Column(columnDefinition = "TEXT")
     private String keywords;
 
-    private String sentiment; // POSITIVE, NEUTRAL, NEGATIVE 등  감정 분석
-
     @Column(columnDefinition = "TEXT")
-    private String tone;
+    private String improvementPoints;
+
+    @Column
+    private int logicalCoherenceScore;
 
     @Column(columnDefinition = "TEXT")
     private String feedback;
 
-    private Integer structureScore;
-    private Integer clarityScore;
-    private Integer coherenceScore;
+    @Column(columnDefinition = "TEXT")
+    private String scoreExplanation;
 
-    private String aiModel; // "gpt-4", "claude", "openai-embedding", 등
+    @Column(columnDefinition = "TEXT")
+    private String expectedQuestions;
 
+
+
+    public void setSpeech(Speech speech) {
+        this.speech = speech;
+    }
+
+    public static AnalysisResult from(AnalysisResultDto dto) {
+        return AnalysisResult.builder()
+                .summary(dto.summary())
+                .keywords(dto.keywords())
+                .improvementPoints(dto.improvementPoints())
+                .scoreExplanation(dto.scoreExplanation())
+                .expectedQuestions(dto.expectedQuestions())
+                .feedback(dto.feedback())
+                .logicalCoherenceScore(dto.logicalCoherenceScore())
+                .build();
+    }
 }

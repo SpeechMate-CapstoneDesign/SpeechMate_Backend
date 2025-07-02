@@ -13,13 +13,21 @@ services:
       my-cache-server:
         condition: service_healthy
     restart: always
+    environment:
+      OPEN_AI_KEY: ${OPEN_AI_KEY}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME}
+      S3_REGION: ${S3_REGION}
+      JWT_SECRET: ${JWT_SECRET}
+      KAKAO_APP_KEY: ${KAKAO_APP_KEY}
 
   my-db:
     image: mysql:8.0
     environment:
       MYSQL_ROOT_PASSWORD: capstone1234!
       MYSQL_DATABASE: capstonedb
-    command: --innodb_buffer_pool_size=128M --max_connections=50   #메모리 사용량을 128MB로 제한 동시 연결 수를 줄임
+    command: --innodb_buffer_pool_size=128M --max_connections=20   #메모리 사용량을 128MB로 제한 동시 연결 수를 줄임
     volumes:
       - ./mysql_data:/var/lib/mysql
     ports:

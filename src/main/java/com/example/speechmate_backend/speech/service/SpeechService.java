@@ -49,7 +49,6 @@ public class SpeechService {
     private final S3UploadPresignedUrlService s3UploadPresignedUrlService;
     private final SpeechRepository speechRepository;
     private final SpeechAnalysisResultService speechAnalysisResultService;
-    private final GoogleSttService googleSttService;
     private final SpeechRestClient speechRestClient;
 
     @Value("${spring.ai.openai.api-key}")

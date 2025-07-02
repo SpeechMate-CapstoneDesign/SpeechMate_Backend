@@ -3,6 +3,10 @@ services:
     image: s13121312/capstoneback:latest
     ports:
       - "8080:8080"
+#    volumes:    google stt 사용 X
+#      - ./google_key.json:/app/google_key.json
+#    environment:
+#      - GOOGLE_APPLICATION_CREDENTIALS=/app/numeric-arena-463302-f1-4a4df104eb74.json
     depends_on:
       my-db:
         condition: service_healthy

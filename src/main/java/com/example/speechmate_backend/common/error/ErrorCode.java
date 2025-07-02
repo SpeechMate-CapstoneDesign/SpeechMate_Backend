@@ -14,6 +14,9 @@ public enum ErrorCode implements ErrorCodeIfs{
     USER_ALREADY_EXIST_INFO("fail", HttpStatus.SC_BAD_REQUEST, "이미 존재하는 Oauth 정보"),
     SPEECH_NOT_FOUND("fail", HttpStatus.SC_NOT_FOUND, "존재하지 않는 스피치"),
     USER_NOT_FOUND("fail", HttpStatus.SC_NOT_FOUND, "존재하지 않는 유저"),
+    SPEECH_CONTENT_ALREADY_EXIST("fail", HttpStatus.SC_CONFLICT, "stt로 변환된 content가 이미 존재."),
+    SPEECH_CONTENT_NOT_EXIST("fail", HttpStatus.SC_CONFLICT, "stt로 변환된 content가 존재X"),
+    SPEECH_ANALYSIS_RESULT_ALREADY_EXIST("fail", HttpStatus.SC_CONFLICT, "ai로 분석된 analysisREsult가 이미 존재."),
     ;
 
 

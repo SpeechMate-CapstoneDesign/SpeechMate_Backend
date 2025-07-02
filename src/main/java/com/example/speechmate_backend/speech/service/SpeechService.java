@@ -185,7 +185,7 @@ public class SpeechService {
         return dto;
     }
 
-    @Transactional
+    /*@Transactional
     public VoiceRecordDto createPresignedUrlGcp(Long userId, MediaFileExtension fileExtension) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> UserNotFoundException.EXCEPTION);
@@ -201,6 +201,6 @@ public class SpeechService {
         speechRepository.save(speech);
 
         return dto;
-    }
+    }*/
 
 }

@@ -15,8 +15,11 @@ services:
     restart: always
     env_file:
       - .env
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
 
-#    environment:
+
+  #    environment:
 #      OPEN_AI_KEY: ${OPEN_AI_KEY}
 #      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
 #      S3_SECRET_KEY: ${S3_SECRET_KEY}

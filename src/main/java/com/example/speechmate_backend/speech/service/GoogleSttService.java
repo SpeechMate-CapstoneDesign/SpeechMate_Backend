@@ -22,7 +22,7 @@ public class GoogleSttService {
     private final Storage storage;
     private final SpeechClient speechClient;
 
-    @Value("${cloud.gcp.gcs.bucket-name}") // application.yml 등에서 버킷 이름 주입
+    @Value("${cloud.gcp.gcs.bucket-name}") // application-local.yml 등에서 버킷 이름 주입
     private String gcsBucketName;
 
     public VoiceRecordDto generateGcsSignedUrlForSpeech(Long userId, Long speechId, MediaFileExtension extension) {

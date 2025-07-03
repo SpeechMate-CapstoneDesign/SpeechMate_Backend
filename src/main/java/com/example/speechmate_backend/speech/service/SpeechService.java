@@ -1,6 +1,5 @@
 package com.example.speechmate_backend.speech.service;
 
-import com.amazonaws.services.s3.model.S3Object;
 import com.example.speechmate_backend.common.ApiResponse;
 import com.example.speechmate_backend.common.exception.SpeechContentAlreadyExistException;
 import com.example.speechmate_backend.common.exception.SpeechContentNotExistException;
@@ -10,34 +9,21 @@ import com.example.speechmate_backend.s3.MediaFileExtension;
 import com.example.speechmate_backend.s3.controller.dto.VoiceRecordDto;
 import com.example.speechmate_backend.s3.service.S3UploadPresignedUrlService;
 import com.example.speechmate_backend.speech.controller.SpeechRestClient;
-import com.example.speechmate_backend.speech.controller.WhisperClient;
 import com.example.speechmate_backend.speech.controller.dto.SpeechResultDto;
 import com.example.speechmate_backend.speech.domain.AnalysisResult;
 import com.example.speechmate_backend.speech.domain.Speech;
 import com.example.speechmate_backend.speech.repository.SpeechRepository;
 import com.example.speechmate_backend.user.domain.User;
 import com.example.speechmate_backend.user.repository.UserRepository;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.Resource;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.InputStream;
+
 
 
 @Slf4j

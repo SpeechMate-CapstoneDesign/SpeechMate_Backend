@@ -1,3 +1,4 @@
+/*
 package com.example.speechmate_backend.speech.controller;
 
 import org.springframework.cloud.openfeign.FeignClient;
@@ -23,3 +24,4 @@ public interface WhisperClient {
             @RequestHeader("Authorization") String authorizationHeader
     );
 }
+*/

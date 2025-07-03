@@ -16,6 +16,8 @@ public class Speech extends BaseEntity {
 
     private String FileUrl;
 
+    @Lob
+    @Column(columnDefinition = "TEXT")
     private String content;  //stt변환 결과
 
 
@@ -38,5 +40,11 @@ public class Speech extends BaseEntity {
 
     public void setUser(User user) {
         this.user = user;
+    }
+
+    public void setAnalysisResult(AnalysisResult analysisResult) {
+        this.analysisResult = analysisResult;
+        // analysisResult 쪽에도 speech를 설정하여 양방향 관계를 동기화
+        analysisResult.setSpeech(this);
     }
 }

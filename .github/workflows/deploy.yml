@@ -59,6 +59,10 @@ jobs:
           script: |
             cd /home/ubuntu/capstone
             
+            echo "Creating .env file from GitHub Secrets..."
+            echo "${{ secrets.ENV_VARS }}" > ./.env
+            
+            
             echo "🧹 Cleaning up existing containers and volumes..."
             docker compose down -v || true
             docker container prune -f || true

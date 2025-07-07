@@ -16,7 +16,7 @@ body:
     attributes:
       label: '🙋 담당자(Assignee)'
       options:
-        - mj010504
+        - s13121312
     validations:
       required: true
       

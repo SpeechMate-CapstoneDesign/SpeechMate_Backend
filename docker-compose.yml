@@ -3,10 +3,6 @@ services:
     image: s13121312/capstoneback:latest
     ports:
       - "8080:8080"
-#    volumes:    google stt 사용 X
-#      - ./google_key.json:/app/google_key.json
-#    environment:
-#      - GOOGLE_APPLICATION_CREDENTIALS=/app/numeric-arena-463302-f1-4a4df104eb74.json
     depends_on:
       my-db:
         condition: service_healthy
@@ -19,14 +15,30 @@ services:
       - SPRING_PROFILES_ACTIVE=dev
 
 
-  #    environment:
-#      OPEN_AI_KEY: ${OPEN_AI_KEY}
-#      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
-#      S3_SECRET_KEY: ${S3_SECRET_KEY}
-#      S3_BUCKET_NAME: ${S3_BUCKET_NAME}
-#      S3_REGION: ${S3_REGION}
-#      JWT_SECRET: ${JWT_SECRET}
-#      KAKAO_APP_KEY: ${KAKAO_APP_KEY}
+  nginx:
+    image: nginx:latest
+    container_name: nginx-capstone
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./certbot/www:/var/www/certbot
+      - ./certbot/conf:/etc/letsencrypt
+#    depends_on:
+#      - server
+    restart: always
+
+  certbot:
+    image: certbot/certbot
+    container_name: certbot
+    volumes:
+      - ./certbot/www:/var/www/certbot
+      - ./certbot/conf:/etc/letsencrypt
+    entrypoint: >
+      sh -c "certbot certonly --webroot -w /var/www/certbot
+      --email wjdals980424@email.com --agree-tos --no-eff-email
+      -d speechmate.site"
 
   my-db:
     image: mysql:8.0

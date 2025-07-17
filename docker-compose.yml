@@ -29,16 +29,16 @@ services:
 #      - server
     restart: always
 
-  certbot:
-    image: certbot/certbot
-    container_name: certbot
-    volumes:
-      - ./certbot/www:/var/www/certbot
-      - ./certbot/conf:/etc/letsencrypt
-    entrypoint: >
-      sh -c "certbot certonly --webroot -w /var/www/certbot
-      --email wjdals980424@email.com --agree-tos --no-eff-email
-      -d speechmate.site"
+#  certbot:
+#    image: certbot/certbot
+#    container_name: certbot
+#    volumes:
+#      - ./certbot/www:/var/www/certbot
+#      - ./certbot/conf:/etc/letsencrypt
+#    entrypoint: >
+#      sh -c "certbot certonly --webroot -w /var/www/certbot
+#      --email wjdals980424@email.com --agree-tos --no-eff-email
+#      -d speechmate.site"
 
   my-db:
     image: mysql:8.0

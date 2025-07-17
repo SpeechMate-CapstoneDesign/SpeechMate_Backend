@@ -18,12 +18,13 @@ import com.example.speechmate_backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-
+import java.io.File;
 
 
 @Slf4j
@@ -144,6 +145,27 @@ public class SpeechService {
             throw new IllegalStateException("Whisper 호출 실패: " + e.getMessage(), e);
         }
     }
+
+
+    public ResponseEntity<ApiResponse<String>> transcribeversion2(MultipartFile file, Long speechId) {
+        try {
+            Speech speech = speechRepository.findById(speechId)
+                    .orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
+            if(speech.getContent() != null && !speech.getContent().isEmpty()) {
+                throw SpeechContentAlreadyExistException.EXCEPTION;
+            }
+
+            // FileSystemResource와 파일명 헤더 포함해서 보내기
+            String content = speechRestClient.transcribeversion2(file);
+            speech.setContent(content);
+            speechRepository.save(speech);
+
+            return ResponseEntity.ok(ApiResponse.ok(content));
+        } catch (Exception e) {
+            throw new RuntimeException("Whisper 변환 실패: " + e.getMessage(), e);
+        }
+    }
+
 
 
 

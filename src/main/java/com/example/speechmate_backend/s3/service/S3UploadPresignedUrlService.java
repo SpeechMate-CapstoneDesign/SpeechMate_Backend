@@ -37,7 +37,7 @@ public class S3UploadPresignedUrlService {
         URL url = amazonS3.generatePresignedUrl(
                 getGeneratePreSignedUrlRequest(bucket, fileName, fileExtension)
         );
-        return VoiceRecordDto.of(url.toString(), fileName);
+        return VoiceRecordDto.of(url.toString(), fileName, speechId);
     }
 
     public String getPublicS3Url(String fileKey) {

@@ -24,8 +24,8 @@ body:
     id: parentKey
     attributes:
       label: '🎟️ 상위 작업의 Ticket Number를 입력해주세요.'
-      description: '이 하위 작업이 속할 상위 작업의 Ticket Number를 입력해주세요 (예: WT-12).'
-      placeholder: 'WT-12'
+      description: '이 하위 작업이 속할 상위 작업의 Ticket Number를 입력해주세요 (예: SM-12).'
+      placeholder: 'SM-12'
     validations:
       required: true
 

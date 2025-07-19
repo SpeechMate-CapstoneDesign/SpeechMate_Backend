@@ -72,11 +72,11 @@ jobs:
 
     
       - name: Create Jira Issue
-        if: startsWith(steps.issue-parser.outputs.issueparser_parentKey, 'WT-')
+        if: startsWith(steps.issue-parser.outputs.issueparser_parentKey, 'SM-')
         id: create
         uses: atlassian/gajira-create@v3
         with:
-          project: WT
+          project: SM
           issuetype: Sub-task
           summary: '${{ github.event.issue.title }}'
           description: '${{ steps.md2jira.outputs.output-text }}'

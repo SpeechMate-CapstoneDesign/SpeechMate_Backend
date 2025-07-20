@@ -46,13 +46,13 @@ public class SpeechController {
         return ResponseEntity.ok(ApiResponse.ok(speechService.createPresignedUrlS3(customUserDetails.getUserId(), fileExtension)));
     }
 
-    @Operation(summary = "2. whisper 이용 text추출 api", description = "파일로부터 stt로변환된 내용을 뽑아냅니다.(1을 먼저 선행하여 s3에 파일 저장후 요청해주세요")
+    /*@Operation(summary = "2. whisper 이용 text추출 api", description = "파일로부터 stt로변환된 내용을 뽑아냅니다.(1을 먼저 선행하여 s3에 파일 저장후 요청해주세요")
     @PostMapping(value = "/Whisperstt/{speechId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ApiResponse<String>> transcribe(
             @Parameter(description = "업로드할 음성 파일", required = true, content = @Content(mediaType = "multipart/form-data"))
             @RequestParam("file") MultipartFile file, @PathVariable Long speechId) {
         return speechService.callWhisperStt(file, speechId);
-    }
+    }*/
 
     //stt결과로 AI 분석까지.
     @Operation(summary = "3. 텍스트 분석 open api", description = "stt로 변환된 content가 있어야 동작합니다.")
@@ -62,6 +62,16 @@ public class SpeechController {
     ) {
         SpeechResultDto dto = speechService.analyze(speechId);
         return ResponseEntity.ok(ApiResponse.ok(dto));
+    }
+
+
+    @Operation(summary = "2-1. whisper api Multipart용", description = "multipart 파일로부터 stt로변환된 내용을 뽑아냅니다.(1을 먼저 선행하여 s3에 파일 저장후 요청해주세요")
+    @PostMapping(value = "/Whisperstt2/{speechId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<ApiResponse<String>> transcribe2(
+            @Parameter(description = "업로드할 음성 파일", required = true, content = @Content(mediaType = "multipart/form-data"))
+            @RequestParam("file") MultipartFile file,
+            @PathVariable Long speechId) {
+        return speechService.transcribeversion2(file, speechId);
     }
 
 

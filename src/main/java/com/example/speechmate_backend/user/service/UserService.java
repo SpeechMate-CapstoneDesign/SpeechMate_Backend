@@ -3,6 +3,7 @@ package com.example.speechmate_backend.user.service;
 import com.example.speechmate_backend.common.exception.UserAlreadyExistException;
 import com.example.speechmate_backend.config.redis.RedisUtil;
 import com.example.speechmate_backend.config.security.JwtUtil;
+import com.example.speechmate_backend.user.controller.dto.TokenReissueResponse;
 import com.example.speechmate_backend.user.domain.OauthInfo;
 import com.example.speechmate_backend.user.domain.User;
 import com.example.speechmate_backend.user.domain.UserSkill;
@@ -11,6 +12,7 @@ import com.example.speechmate_backend.user.repository.UserSkillRepository;
 import com.example.speechmate_backend.oauth.dto.AfterOauthSignupDto;
 import com.example.speechmate_backend.oauth.dto.OauthLoginResponse;
 import com.example.speechmate_backend.oauth.helper.KakaoOauthHelper;
+import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -78,5 +80,9 @@ public class UserService {
 
         userSkillRepository.saveAll(userSkills);
         return generateLoginResponse(user, true);
+    }
+
+    public TokenReissueResponse reissueToken(@NotBlank(message = "refresh token is required") String refreshToken) {
+        return jwtUtil.reissueToken(refreshToken);
     }
 }

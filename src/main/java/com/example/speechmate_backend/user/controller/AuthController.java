@@ -2,6 +2,8 @@ package com.example.speechmate_backend.user.controller;
 
 import com.example.speechmate_backend.common.ApiResponse;
 import com.example.speechmate_backend.common.exception.InvalidOauthProviderException;
+import com.example.speechmate_backend.user.controller.dto.TokenReissueRequest;
+import com.example.speechmate_backend.user.controller.dto.TokenReissueResponse;
 import com.example.speechmate_backend.user.domain.OauthInfo;
 import com.example.speechmate_backend.oauth.KakaoProperties;
 import com.example.speechmate_backend.oauth.dto.AfterOauthSignupDto;
@@ -12,6 +14,7 @@ import com.example.speechmate_backend.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -80,6 +83,13 @@ public class AuthController {
 
         String idToken = (String) response.getBody().get("id_token");
         return ResponseEntity.ok(idToken);
+    }
+
+    @Operation(summary = "refresh토큰 재발급", description = "액세스 토큰, 리프레쉬 토큰이 재발급되고 원래 리프레쉬 토큰은 블랙리스트에 추가합니다.")
+    @PostMapping("/reissue")
+    public ResponseEntity<ApiResponse<TokenReissueResponse>> reissueAccessToken(@Valid @RequestBody TokenReissueRequest request) {
+        TokenReissueResponse response = userService.reissueToken(request.refreshToken());
+        return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
 

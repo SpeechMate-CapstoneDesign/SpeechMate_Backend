@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:mysql://my-db:3306/capstonedb
+    url: jdbc:mysql://my-db:3306/capstonedb?serverTimezone=Asia/Seoul
     username: root
     password: capstone1234!
 

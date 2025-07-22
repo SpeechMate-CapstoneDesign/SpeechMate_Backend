@@ -3,7 +3,9 @@ package com.example.speechmate_backend.speech.controller;
 import com.example.speechmate_backend.common.ApiResponse;
 import com.example.speechmate_backend.config.security.CustomUserDetails;
 import com.example.speechmate_backend.s3.MediaFileExtension;
+import com.example.speechmate_backend.s3.controller.dto.VoiceKeyDto;
 import com.example.speechmate_backend.s3.controller.dto.VoiceRecordDto;
+import com.example.speechmate_backend.speech.controller.dto.SpeechIdDto;
 import com.example.speechmate_backend.speech.controller.dto.SpeechResultDto;
 import com.example.speechmate_backend.speech.service.SpeechService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -39,7 +41,7 @@ public class SpeechController {
 
     @Operation(summary = "1. s3용 presigned url 발급", description ="요청 후에 나온 url에다가 put 메소드로 파일 업로드하면 됩니다")
     @PostMapping("/presignedWithS3")
-    public ResponseEntity<ApiResponse<VoiceRecordDto>> createSpeechAndGetPresignedUrlS3(
+    public ResponseEntity<ApiResponse<VoiceKeyDto>> createSpeechAndGetPresignedUrlS3(
             @AuthenticationPrincipal CustomUserDetails customUserDetails,
             @RequestParam MediaFileExtension fileExtension
     ) {
@@ -73,6 +75,17 @@ public class SpeechController {
             @PathVariable Long speechId) {
         return speechService.transcribeversion2(file, speechId);
     }
+
+    @Operation(summary = "1-1. 업로드 완료 콜백", description = "클라이언트가 presigned url로 업로드 완료한 후 콜백 합니다.")
+    @PostMapping("/s3-callback")
+    public ResponseEntity<ApiResponse<SpeechIdDto>> callbackAfterUpload(
+            @AuthenticationPrincipal CustomUserDetails customUserDetails,
+            @RequestParam String fileKey
+    ) {
+        SpeechIdDto speechId = speechService.registerUploadedSpeech(customUserDetails.getUserId(), fileKey);
+        return ResponseEntity.ok(ApiResponse.ok(speechId));
+    }
+
 
 
    /* @PostMapping("/{speechId}/transcribeWithWhisper")

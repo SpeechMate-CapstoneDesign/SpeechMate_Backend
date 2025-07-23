@@ -77,7 +77,7 @@ public class S3UploadPresignedUrlService {
     private String getMimeTypeFromExtension(String extension) {
         return switch (extension.toLowerCase()) {
             case "mp3" -> "audio/mpeg";
-            case "wav", "wave" -> "audio/wave";
+            case "wav", "wave" -> "audio/wav";
             case "webm" -> "audio/webm";
             case "m4a" -> "audio/mp4";
             case "mp4" -> "video/mp4";

@@ -4,7 +4,7 @@ import lombok.Getter;
 
 @Getter
 public enum MediaFileExtension {
-    WAV("audio/wave"),
+    WAV("audio/wav"),
     MP3("audio/mpeg"),
     MP4("video/mp4"),
     MOV("video/quicktime"),

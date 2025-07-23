@@ -6,9 +6,11 @@ import com.example.speechmate_backend.common.exception.SpeechContentNotExistExce
 import com.example.speechmate_backend.common.exception.SpeechNotFoundException;
 import com.example.speechmate_backend.common.exception.UserNotFoundException;
 import com.example.speechmate_backend.s3.MediaFileExtension;
+import com.example.speechmate_backend.s3.controller.dto.VoiceKeyDto;
 import com.example.speechmate_backend.s3.controller.dto.VoiceRecordDto;
 import com.example.speechmate_backend.s3.service.S3UploadPresignedUrlService;
 import com.example.speechmate_backend.speech.controller.SpeechRestClient;
+import com.example.speechmate_backend.speech.controller.dto.SpeechIdDto;
 import com.example.speechmate_backend.speech.controller.dto.SpeechResultDto;
 import com.example.speechmate_backend.speech.domain.AnalysisResult;
 import com.example.speechmate_backend.speech.domain.Speech;
@@ -171,26 +173,28 @@ public class SpeechService {
 
 
     @Transactional
-    public VoiceRecordDto createPresignedUrlS3(Long userId, MediaFileExtension fileExtension) {
-        // 1. Speech 객체 저장 (content, audioFileUrl은 아직 null)
+    public VoiceKeyDto createPresignedUrlS3(Long userId, MediaFileExtension fileExtension) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> UserNotFoundException.EXCEPTION);
         log.info("userID: " + userId);
-        Speech speech = new Speech();
-
-        user.addSpeech(speech);
-        speechRepository.save(speech);// 이 시점에 speechId 생성
-        log.info("speechId: " + speech.getId());
 
         // 2. Presigned URL 발급
-        VoiceRecordDto dto = s3UploadPresignedUrlService.generatePreSignedUrlForSpeech(userId, speech.getId(), fileExtension);
-
-        //Speech에 S3 Key 저장
-        speech.setFileUrl(dto.key());
-
-        speechRepository.save(speech);
+        VoiceKeyDto dto = s3UploadPresignedUrlService.generatePreSignedUrlForSpeech(userId, fileExtension);
 
         return dto;
+    }
+
+    @Transactional
+    public SpeechIdDto registerUploadedSpeech(Long userId, String fileKey) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> UserNotFoundException.EXCEPTION);
+
+        Speech speech = new Speech();
+        speech.setFileUrl(fileKey); // 실제 s3 key
+        user.addSpeech(speech);
+        speechRepository.save(speech);
+
+        return SpeechIdDto.of(speech.getId());
     }
 
     /*@Transactional

@@ -7,6 +7,7 @@ import com.amazonaws.services.s3.model.CannedAccessControlList;
 import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest;
 import com.amazonaws.services.s3.model.S3Object;
 import com.example.speechmate_backend.s3.MediaFileExtension;
+import com.example.speechmate_backend.s3.controller.dto.VoiceKeyDto;
 import com.example.speechmate_backend.s3.controller.dto.VoiceRecordDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,14 +31,14 @@ public class S3UploadPresignedUrlService {
 
     private static final long PRESIGNED_URL_EXPIRATION_MILLIS = 1000 * 60 * 10;
 
-    public VoiceRecordDto generatePreSignedUrlForSpeech(Long userId, Long speechId, MediaFileExtension mediaFileExtension) {
+    public VoiceKeyDto generatePreSignedUrlForSpeech(Long userId, MediaFileExtension mediaFileExtension) {
         String fileExtension = mediaFileExtension.getUploadExtension();
-        String fileName = getSpeechFileName(userId, speechId, fileExtension);
+        String fileName = getSpeechFileName(userId, fileExtension);
 
         URL url = amazonS3.generatePresignedUrl(
                 getGeneratePreSignedUrlRequest(bucket, fileName, fileExtension)
         );
-        return VoiceRecordDto.of(url.toString(), fileName, speechId);
+        return VoiceKeyDto.of(url.toString(), fileName);
     }
 
     public String getPublicS3Url(String fileKey) {
@@ -64,12 +65,10 @@ public class S3UploadPresignedUrlService {
     }
 
 
-    private String getSpeechFileName(Long userId, Long speechId, String fileExtension) {
+    private String getSpeechFileName(Long userId, String fileExtension) {
         return "user/"
                 + userId.toString()
                 + "/speech/"
-                + speechId
-                + "/"
                 + UUID.randomUUID()
                 +"."
                 +fileExtension;
@@ -80,7 +79,8 @@ public class S3UploadPresignedUrlService {
             case "mp3" -> "audio/mpeg";
             case "wav", "wave" -> "audio/wave";
             case "webm" -> "audio/webm";
-            case "m4a", "mp4" -> "audio/mp4";
+            case "m4a" -> "audio/mp4";
+            case "mp4" -> "video/mp4";
             default -> "application/octet-stream";
         };
     }

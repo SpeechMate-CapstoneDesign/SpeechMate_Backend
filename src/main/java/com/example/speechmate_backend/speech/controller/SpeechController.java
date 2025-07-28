@@ -30,15 +30,6 @@ public class SpeechController {
     private final SpeechService speechService;
     private final SpeechRestClient speechRestClient;
 
-    // 1. Speech 생성 + presigned URL 발급(gcs)
-    /*@Operation(summary = "gcs용 presigned url 발급(사용X)")
-    @PostMapping("/presignedWithGcs")
-    public ResponseEntity<ApiResponse<VoiceRecordDto>> createSpeechAndGetPresignedUrlGcs(
-            @AuthenticationPrincipal CustomUserDetails customUserDetails,
-            @RequestParam MediaFileExtension fileExtension
-    ) {
-        return ResponseEntity.ok(ApiResponse.ok(speechService.createPresignedUrlGcp(customUserDetails.getUserId(), fileExtension)));
-    }*/
 
     @Operation(summary = "1. s3용 presigned url 발급", description ="요청 후에 나온 url에다가 put 메소드로 파일 업로드하면 됩니다")
     @PostMapping("/presignedWithS3")
@@ -77,6 +68,16 @@ public class SpeechController {
         return speechService.transcribeversion2(file, speechId);
     }
 
+    @Operation(summary = "2-1. whisper api s3에서 받아온것", description = "저장된 s3 파일로부터 stt로변환된 내용을 뽑아냅니다.(1을 먼저 선행하여 s3에 파일 저장후 요청해주세요")
+    @PostMapping(value = "/Whisperstt3/{speechId}")
+    public ResponseEntity<ApiResponse<String>> transcribes3(
+            @Parameter(description = "업로드할 음성 파일", required = true, content = @Content(mediaType = "multipart/form-data"))
+            @RequestParam("fileKey") String fileKey,
+            @PathVariable Long speechId) {
+        return speechService.transcribeversionFromS3(fileKey, speechId);
+    }
+
+
     @Operation(summary = "1-1. 업로드 완료 콜백", description = "클라이언트가 presigned url로 업로드 완료한 후 콜백 합니다.")
     @PostMapping("/s3-callback")
     public ResponseEntity<ApiResponse<SpeechIdDto>> callbackAfterUpload(
@@ -100,38 +101,6 @@ public class SpeechController {
     }
 
 
-   /* @PostMapping("/{speechId}/transcribeWithWhisper")
-    public ResponseEntity<ApiResponse<Long>> transcribeSpeechWithWhisper(
-            @PathVariable Long speechId
-    ) {
-        speechService.transcribeWithWhisper(speechId);
-        return ResponseEntity.ok(ApiResponse.ok(speechId));
-    }*/
-
-    // s3 presigned url로 파일 올린 후  안되서 임시로 만든 upload
-    /*@PostMapping("/upload/{speechId}")
-    public ResponseEntity<String> testUploadWhisper(
-            @PathVariable Long speechId,
-            @RequestPart("file") MultipartFile file
-
-    ) {
-        //String result = speechService.transcribeWithMultipartFile(file, speechId);
-        String result = speechService.callWhisperStt(file, speechId);
-
-        return ResponseEntity.ok(result);
-    }*/
-
-
-
-
-
-    /*@PostMapping("/{speechId}/transcribe")
-    public ResponseEntity<ApiResponse<Long>> transcribeSpeechWithGoogle(
-            @PathVariable Long speechId
-    ) {
-        speechService.transcribeWithGoogle(speechId);
-        return ResponseEntity.ok(ApiResponse.ok(speechId));
-    }*/
 
 
 

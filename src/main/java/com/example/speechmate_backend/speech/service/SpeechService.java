@@ -1,10 +1,7 @@
 package com.example.speechmate_backend.speech.service;
 
 import com.example.speechmate_backend.common.ApiResponse;
-import com.example.speechmate_backend.common.exception.SpeechContentAlreadyExistException;
-import com.example.speechmate_backend.common.exception.SpeechContentNotExistException;
-import com.example.speechmate_backend.common.exception.SpeechNotFoundException;
-import com.example.speechmate_backend.common.exception.UserNotFoundException;
+import com.example.speechmate_backend.common.exception.*;
 import com.example.speechmate_backend.s3.MediaFileExtension;
 import com.example.speechmate_backend.s3.controller.dto.VoiceKeyDto;
 import com.example.speechmate_backend.s3.controller.dto.VoiceRecordDto;
@@ -28,6 +25,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 
@@ -171,6 +169,26 @@ public class SpeechService {
         }
     }
 
+    public ResponseEntity<ApiResponse<String>> transcribeversionFromS3(String fileKey, Long speechId) {
+        try {
+            Speech speech = speechRepository.findById(speechId)
+                    .orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
+            if(speech.getContent() != null && !speech.getContent().isEmpty()) {
+                throw SpeechContentAlreadyExistException.EXCEPTION;
+            }
+            if(!Objects.equals(speech.getFileUrl(), fileKey)) {
+                throw SpeechFileKeyNotEqualException.EXCEPTION;
+            }
+            String content = speechRestClient.transcribeversionFromS3(fileKey);
+            speech.setContent(content);
+            speechRepository.save(speech);
+
+            return ResponseEntity.ok(ApiResponse.ok(content));
+        } catch (Exception e) {
+            throw new RuntimeException("Whisper 변환 실패: " + e.getMessage(), e);
+        }
+
+    }
 
 
 

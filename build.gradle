@@ -34,6 +34,24 @@ ext {
     set('springCloudVersion', "2023.0.3")
 }
 
+def queryDslVersion = "7.0" // 25년 7월 기준 가장 최신
+def querydslSrcDir  = layout.buildDirectory.dir("generated/querydsl").get().asFile // build/generated/querydsl
+
+tasks.withType(JavaCompile).configureEach {
+    options.getGeneratedSourceOutputDirectory().set(file(querydslSrcDir))
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs += querydslSrcDir
+        }
+    }
+}
+configurations {
+    querydsl.extendsFrom compileClasspath
+}
+
 dependencies {
 
     implementation 'org.springframework.boot:spring-boot-starter-web'
@@ -80,6 +98,11 @@ dependencies {
 
 
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.0.2' // Swagger
+
+    //Querydsl
+    implementation("io.github.openfeign.querydsl:querydsl-core:${queryDslVersion}")
+    implementation("io.github.openfeign.querydsl:querydsl-jpa:$queryDslVersion")
+    annotationProcessor("io.github.openfeign.querydsl:querydsl-apt:$queryDslVersion:jpa")
 
 }
 

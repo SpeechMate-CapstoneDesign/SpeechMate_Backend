@@ -1,19 +1,16 @@
 package com.example.speechmate_backend.speech.service;
 
 import com.example.speechmate_backend.common.ApiResponse;
-import com.example.speechmate_backend.common.exception.SpeechContentAlreadyExistException;
-import com.example.speechmate_backend.common.exception.SpeechContentNotExistException;
-import com.example.speechmate_backend.common.exception.SpeechNotFoundException;
-import com.example.speechmate_backend.common.exception.UserNotFoundException;
+import com.example.speechmate_backend.common.exception.*;
 import com.example.speechmate_backend.s3.MediaFileExtension;
 import com.example.speechmate_backend.s3.controller.dto.VoiceKeyDto;
 import com.example.speechmate_backend.s3.controller.dto.VoiceRecordDto;
 import com.example.speechmate_backend.s3.service.S3UploadPresignedUrlService;
 import com.example.speechmate_backend.speech.controller.SpeechRestClient;
-import com.example.speechmate_backend.speech.controller.dto.SpeechIdDto;
-import com.example.speechmate_backend.speech.controller.dto.SpeechResultDto;
+import com.example.speechmate_backend.speech.controller.dto.*;
 import com.example.speechmate_backend.speech.domain.AnalysisResult;
 import com.example.speechmate_backend.speech.domain.Speech;
+import com.example.speechmate_backend.speech.repository.SpeechCustomRepository;
 import com.example.speechmate_backend.speech.repository.SpeechRepository;
 import com.example.speechmate_backend.user.domain.User;
 import com.example.speechmate_backend.user.repository.UserRepository;
@@ -27,6 +24,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 
 @Slf4j
@@ -39,6 +39,7 @@ public class SpeechService {
     private final SpeechRepository speechRepository;
     private final SpeechAnalysisResultService speechAnalysisResultService;
     private final SpeechRestClient speechRestClient;
+    private final SpeechCustomRepository speechCustomRepository;
 
     @Value("${spring.ai.openai.api-key}")
     private String openAiApiKey;
@@ -168,6 +169,26 @@ public class SpeechService {
         }
     }
 
+    public ResponseEntity<ApiResponse<String>> transcribeversionFromS3(String fileKey, Long speechId) {
+        try {
+            Speech speech = speechRepository.findById(speechId)
+                    .orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
+            if(speech.getContent() != null && !speech.getContent().isEmpty()) {
+                throw SpeechContentAlreadyExistException.EXCEPTION;
+            }
+            if(!Objects.equals(speech.getFileUrl(), fileKey)) {
+                throw SpeechFileKeyNotEqualException.EXCEPTION;
+            }
+            String content = speechRestClient.transcribeversionFromS3(fileKey);
+            speech.setContent(content);
+            speechRepository.save(speech);
+
+            return ResponseEntity.ok(ApiResponse.ok(content));
+        } catch (Exception e) {
+            throw new RuntimeException("Whisper 변환 실패: " + e.getMessage(), e);
+        }
+
+    }
 
 
 
@@ -197,22 +218,41 @@ public class SpeechService {
         return SpeechIdDto.of(speech.getId());
     }
 
-    /*@Transactional
-    public VoiceRecordDto createPresignedUrlGcp(Long userId, MediaFileExtension fileExtension) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> UserNotFoundException.EXCEPTION);
-        Speech speech = new Speech();
-        user.addSpeech(speech);
-        speechRepository.save(speech);
 
-        // GCS 로 변경
-        VoiceRecordDto dto = googleSttService.generateGcsSignedUrlForSpeech(userId, speech.getId(), fileExtension);
+    public SpeechPagingResponseDto getNextSpeeches(Long userId, Long lastSpeechId, int limit) {
+        List<SpeechAnalysisResponseDto> speeches = speechCustomRepository.findNextSpeeches(userId, lastSpeechId, limit + 1) //hasNext를 알기 위해 +1을 해줍니다.
+                .stream()
+                .map(dto -> {
+                    String publicUrl = s3UploadPresignedUrlService.getPublicS3Url(dto.fileUrl());
+                    return new SpeechAnalysisResponseDto(
+                            dto.speechId(),
+                            dto.createdAt(),
+                            publicUrl, // fileUrl만 교체
+                            dto.content(),
+                            dto.summary(),
+                            dto.keywords(),
+                            dto.improvementPoints(),
+                            dto.logicalCoherenceScore(),
+                            dto.feedback(),
+                            dto.scoreExplanation(),
+                            dto.expectedQuestions()
+                    );
+                })
+                .collect(Collectors.toList());
 
-        // Speech 에 objectName 저장
-        speech.setFileUrl(dto.key());
-        speechRepository.save(speech);
 
-        return dto;
-    }*/
+        boolean hasNext = speeches.size() > limit;
+        if (hasNext) {
+            speeches = speeches.subList(0, limit);
+        }
 
+        CursorDto cursorDto = speeches.isEmpty() ?
+                null : new CursorDto(speeches.get(speeches.size() - 1).createdAt(), speeches.get(speeches.size() - 1).speechId());
+
+        return SpeechPagingResponseDto.builder()
+                .speeches(speeches)
+                .hasNext(hasNext)
+                .cursordto(cursorDto)
+                .build();
+    }
 }

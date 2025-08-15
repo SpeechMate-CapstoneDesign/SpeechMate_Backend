@@ -2,6 +2,7 @@ package com.example.speechmate_backend.user.controller;
 
 import com.example.speechmate_backend.common.ApiResponse;
 import com.example.speechmate_backend.common.exception.InvalidOauthProviderException;
+import com.example.speechmate_backend.config.security.CustomUserDetails;
 import com.example.speechmate_backend.user.controller.dto.TokenReissueRequest;
 import com.example.speechmate_backend.user.controller.dto.TokenReissueResponse;
 import com.example.speechmate_backend.user.domain.OauthInfo;
@@ -20,6 +21,8 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.*;
@@ -50,7 +53,7 @@ public class AuthController {
 
     @Operation(summary = "카카오 회원가입", description = "최초 카카오 로그인 사용자의 추가 정보와 함께 회원가입을 진행합니다.")
     @PostMapping("/oauth/kakao/signup")
-    public ResponseEntity<ApiResponse<OauthLoginResponse>> signupWhenFirstOauthLogin(@RequestBody AfterOauthSignupDto afterOauthSignupDto) {
+    public ResponseEntity<ApiResponse<OauthLoginResponse>> signupWhenFirstOauthLogin(@RequestBody @Valid AfterOauthSignupDto afterOauthSignupDto) {
         return ResponseEntity.ok(ApiResponse.ok(userService.signupKakaoWhenFirstOauthLogin(afterOauthSignupDto)));
     }
 
@@ -92,5 +95,17 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
+    @Operation(summary = "로그아웃", description = "서버에 저자된 refresh token을 버립니다. 클라이언트는 access token을 처리해주세요.")
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<String>> logout(@AuthenticationPrincipal CustomUserDetails user) {
+        userService.logout(user.getUserId());
+        return ResponseEntity.ok(ApiResponse.ok("로그아웃 성공"));
+    }
 
+    @Operation(summary = "회원 탈퇴", description = "회원 탈퇴를 합니다.")
+    @PostMapping("/withdraw")
+    public ResponseEntity<ApiResponse<String>> withdraw(@AuthenticationPrincipal CustomUserDetails user) {
+        userService.withdraw(user.getUserId());
+        return ResponseEntity.ok(ApiResponse.ok("회원 탈퇴 처리 완료"));
+    }
 }

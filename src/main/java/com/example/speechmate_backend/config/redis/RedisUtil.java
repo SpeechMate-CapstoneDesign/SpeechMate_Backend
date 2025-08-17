@@ -36,4 +36,8 @@ public class RedisUtil {
     public String getRefreshToken(String userId) {
         return redisTemplate.opsForValue().get(REFRESH_TOKEN_PREFIX + userId);
     }
+
+    public void deleteRefreshToken(String userId) {
+        redisTemplate.delete(REFRESH_TOKEN_PREFIX + userId);
+    }
 }

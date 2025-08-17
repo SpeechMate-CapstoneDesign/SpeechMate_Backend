@@ -1,6 +1,7 @@
 package com.example.speechmate_backend.user.service;
 
 import com.example.speechmate_backend.common.exception.UserAlreadyExistException;
+import com.example.speechmate_backend.common.exception.UserNotFoundException;
 import com.example.speechmate_backend.config.redis.RedisUtil;
 import com.example.speechmate_backend.config.security.JwtUtil;
 import com.example.speechmate_backend.user.controller.dto.TokenReissueResponse;
@@ -15,6 +16,7 @@ import com.example.speechmate_backend.oauth.helper.KakaoOauthHelper;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -62,6 +64,7 @@ public class UserService {
 
     }
 
+    @Transactional
     public OauthLoginResponse signupKakaoWhenFirstOauthLogin(AfterOauthSignupDto afterOauthSignupDto) {
         OauthInfo oauthInfo = kakaoOauthHelper.getOauthInfoByKakaoIdToken(afterOauthSignupDto.idToken());
         //이미 있는 유저면 에러
@@ -84,5 +87,19 @@ public class UserService {
 
     public TokenReissueResponse reissueToken(@NotBlank(message = "refresh token is required") String refreshToken) {
         return jwtUtil.reissueToken(refreshToken);
+    }
+
+    public void logout(Long userId) {
+        redisUtil.deleteRefreshToken(userId.toString());
+    }
+
+    @Transactional
+    public void withdraw(Long userId) {
+        User user = userRepository.findById(userId)
+                        .orElseThrow(() -> UserNotFoundException.EXCEPTION);
+
+        userRepository.delete(user);
+
+        redisUtil.deleteRefreshToken(userId.toString());
     }
 }

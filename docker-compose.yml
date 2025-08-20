@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   server:
     image: s13121312/capstoneback:latest
@@ -14,6 +16,8 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=dev
       - TZ=Asia/Seoul
+    networks:
+      - capstone-net
 
   nginx:
     image: nginx:latest
@@ -25,27 +29,16 @@ services:
       - ./nginx/conf.d:/etc/nginx/conf.d
       - ./certbot/www:/var/www/certbot
       - ./certbot/conf:/etc/letsencrypt
-#    depends_on:
-#      - server
     restart: always
-
-#  certbot:
-#    image: certbot/certbot
-#    container_name: certbot
-#    volumes:
-#      - ./certbot/www:/var/www/certbot
-#      - ./certbot/conf:/etc/letsencrypt
-#    entrypoint: >
-#      sh -c "certbot certonly --webroot -w /var/www/certbot
-#      --email wjdals980424@email.com --agree-tos --no-eff-email
-#      -d speechmate.site"
+    networks:
+      - capstone-net
 
   my-db:
     image: mysql:8.0
     environment:
       MYSQL_ROOT_PASSWORD: capstone1234!
       MYSQL_DATABASE: capstonedb
-    command: --innodb_buffer_pool_size=128M --max_connections=20   #메모리 사용량을 128MB로 제한 동시 연결 수를 줄임
+    command: --innodb_buffer_pool_size=128M --max_connections=20  #메모리 사용량을 128MB로 제한 동시 연결 수를 줄임
     volumes:
       - ./mysql_data:/var/lib/mysql
     ports:
@@ -56,6 +49,9 @@ services:
       timeout: 5s
       retries: 10
     restart: always
+    # 네트워크 할당
+    networks:
+      - capstone-net
 
   my-cache-server:
     image: redis:latest
@@ -67,3 +63,10 @@ services:
       timeout: 5s
       retries: 10
     restart: always
+    networks:
+      - capstone-net
+
+# 사용할 네트워크
+networks:
+  capstone-net:
+    driver: bridge

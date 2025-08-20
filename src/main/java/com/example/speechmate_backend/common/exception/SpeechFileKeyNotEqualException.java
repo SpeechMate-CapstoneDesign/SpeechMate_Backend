@@ -8,6 +8,6 @@ public class SpeechFileKeyNotEqualException extends SmateException {
 
 
     public SpeechFileKeyNotEqualException() {
-        super(ErrorCode.SPEECH_CONTENT_ALREADY_EXIST);
+        super(ErrorCode.SPEECH_FILE_KEY_DOES_NOT_EQUAL);
     }
 }

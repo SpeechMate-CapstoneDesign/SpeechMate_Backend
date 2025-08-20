@@ -169,17 +169,21 @@ public class SpeechService {
         }
     }
 
-    public ResponseEntity<ApiResponse<String>> transcribeversionFromS3(String fileKey, Long speechId) {
+    public ResponseEntity<ApiResponse<String>> transcribeversionFromS3(Long speechId) {
         try {
             Speech speech = speechRepository.findById(speechId)
                     .orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
             if(speech.getContent() != null && !speech.getContent().isEmpty()) {
                 throw SpeechContentAlreadyExistException.EXCEPTION;
             }
-            if(!Objects.equals(speech.getFileUrl(), fileKey)) {
-                throw SpeechFileKeyNotEqualException.EXCEPTION;
+
+            String fileKeyFromDb = speech.getFileUrl();
+            if (fileKeyFromDb == null || fileKeyFromDb.isEmpty()) {
+                // fileKey가 DB에 없는 경우에 대한 예외 처리
+                throw SpeechFileKeyNotFoundException.EXCEPTION;
             }
-            String content = speechRestClient.transcribeversionFromS3(fileKey);
+
+            String content = speechRestClient.transcribeversionFromS3(fileKeyFromDb);
             speech.setContent(content);
             speechRepository.save(speech);
 

@@ -1,6 +1,8 @@
 package com.example.speechmate_backend.speech.controller;
 
 import com.amazonaws.services.s3.model.S3Object;
+import com.example.speechmate_backend.common.exception.WhisperException;
+import com.example.speechmate_backend.s3.MediaFileExtension;
 import com.example.speechmate_backend.s3.service.S3UploadPresignedUrlService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -101,15 +103,19 @@ public class SpeechRestClient {
             S3Object s3Object = s3UploadPresignedUrlService.getObject(fileKey);
             InputStream inputStream = s3Object.getObjectContent();
 
+            String fileExtension = getFileExtension(fileKey);
+            MediaFileExtension mediaType = MediaFileExtension.valueOf(fileExtension.toUpperCase());
+
             // 2. InputStream → 임시 파일로 저장
-            File tempFile = File.createTempFile("speech", ".mp3");
+            File tempFile = File.createTempFile("speech", mediaType.getUploadExtension());
             Files.copy(inputStream, tempFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
 
             FileSystemResource fileResource = new FileSystemResource(tempFile);
 
             MultipartBodyBuilder builder = new MultipartBodyBuilder();
             builder.part("file", fileResource)
-                    .header("Content-Disposition", "form-data; name=\"file\"; filename=\"speech.mp3\"");
+                    .filename("speech." + mediaType.getUploadExtension())
+                            .contentType(MediaType.valueOf(mediaType.getMimeType()));
             builder.part("model", "whisper-1");
             builder.part("language", "ko");
             builder.part("response_format", "text");
@@ -127,8 +133,11 @@ public class SpeechRestClient {
 
             return response;
         } catch (Exception e) {
-            throw new RuntimeException("STT 변환 실패: " + e.getMessage(), e);
+            throw WhisperException.EXCEPTION;
         }
     }
 
+    private String getFileExtension(String fileKey) {
+        return fileKey.substring(fileKey.lastIndexOf(".")+1).toLowerCase();
+    }
 }

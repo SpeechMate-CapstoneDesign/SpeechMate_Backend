@@ -59,22 +59,21 @@ public class SpeechController {
     }
 
 
-    @Operation(summary = "2-1. whisper api Multipart용", description = "multipart 파일로부터 stt로변환된 내용을 뽑아냅니다.(1을 먼저 선행하여 s3에 파일 저장후 요청해주세요")
-    @PostMapping(value = "/Whisperstt2/{speechId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<ApiResponse<String>> transcribe2(
-            @Parameter(description = "업로드할 음성 파일", required = true, content = @Content(mediaType = "multipart/form-data"))
-            @RequestParam("file") MultipartFile file,
-            @PathVariable Long speechId) {
-        return speechService.transcribeversion2(file, speechId);
-    }
+//    @Operation(summary = "2-1. whisper api Multipart용", description = "multipart 파일로부터 stt로변환된 내용을 뽑아냅니다.(1을 먼저 선행하여 s3에 파일 저장후 요청해주세요")
+//    @PostMapping(value = "/Whisperstt2/{speechId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+//    public ResponseEntity<ApiResponse<String>> transcribe2(
+//            @Parameter(description = "업로드할 음성 파일", required = true, content = @Content(mediaType = "multipart/form-data"))
+//            @RequestParam("file") MultipartFile file,
+//            @PathVariable Long speechId) {
+//        return speechService.transcribeversion2(file, speechId);
+//    }
 
     @Operation(summary = "2-1. whisper api s3에서 받아온것", description = "저장된 s3 파일로부터 stt로변환된 내용을 뽑아냅니다.(1을 먼저 선행하여 s3에 파일 저장후 요청해주세요")
     @PostMapping(value = "/Whisperstt3/{speechId}")
     public ResponseEntity<ApiResponse<String>> transcribes3(
-            @Parameter(description = "업로드할 음성 파일", required = true, content = @Content(mediaType = "multipart/form-data"))
-            @RequestParam("fileKey") String fileKey,
+            @Parameter(description = "stt변환을 진행할 speechId", required = true)
             @PathVariable Long speechId) {
-        return speechService.transcribeversionFromS3(fileKey, speechId);
+        return speechService.transcribeversionFromS3(speechId);
     }
 
 

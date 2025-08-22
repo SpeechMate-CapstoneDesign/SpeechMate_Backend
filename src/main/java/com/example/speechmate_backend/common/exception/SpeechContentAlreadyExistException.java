@@ -9,6 +9,6 @@ public class SpeechContentAlreadyExistException extends SmateException {
 
 
     public SpeechContentAlreadyExistException() {
-        super(ErrorCode.SPEECH_ANALYSIS_RESULT_ALREADY_EXIST);
+        super(ErrorCode.SPEECH_CONTENT_ALREADY_EXIST);
     }
 }

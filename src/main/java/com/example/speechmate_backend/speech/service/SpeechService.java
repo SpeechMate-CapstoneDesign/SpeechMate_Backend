@@ -73,7 +73,9 @@ public class SpeechService {
                 .orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
 
         if (speech.getAnalysisResult() != null) {
-            throw SpeechContentAlreadyExistException.EXCEPTION; // 이미 분석된 경우 종료
+            String fileUrl = s3UploadPresignedUrlService.getPublicS3Url(speech.getFileUrl());
+            return SpeechResultDto.from(speech, fileUrl);
+            //throw SpeechContentAlreadyExistException.EXCEPTION; // 이미 분석된 경우 종료
         }
 
         if (speech.getContent() == null || speech.getContent().isEmpty()) {

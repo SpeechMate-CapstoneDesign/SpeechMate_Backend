@@ -99,6 +99,15 @@ public class SpeechController {
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
+    @Operation(summary = "스피치 메타데이터 추가", description = "발급받은 speechId에 해당하는 스피치에 발표 정보를 추가합니다.")
+    @PutMapping("/metatdata/{speechId}")
+    public ResponseEntity<ApiResponse<SpeechIdDto>> addMetadata(
+            @PathVariable Long speechId,
+            @Valid @RequestBody SpeechMetadataRequestDto requestDto,
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(speechService.addMetadataToSpeech(speechId, requestDto, userDetails.getUserId())));
+    }
 
 
 

@@ -262,5 +262,21 @@ public class SpeechService {
                 .build();
     }
 
+    @Transactional
+    public SpeechIdDto addMetadataToSpeech(Long speechId, SpeechMetadataRequestDto requestDto, Long userId) {
+        Speech speech = speechRepository.findById(speechId)
+                .orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
 
+        if (!speech.getUser().getId().equals(userId)) {
+            throw UserNotMatchException.EXCEPTION;
+        }
+
+        speech.updateMetadata(
+                requestDto.title(),
+                requestDto.presentationContext(),
+                requestDto.audience(),
+                requestDto.location()
+        );
+        return SpeechIdDto.of(speechId);
+    }
 }

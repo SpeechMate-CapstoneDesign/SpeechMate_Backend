@@ -224,39 +224,49 @@ public class SpeechService {
         return SpeechIdDto.of(speech.getId());
     }
 
-
+    @Transactional(readOnly = true)
     public SpeechPagingResponseDto getNextSpeeches(Long userId, Long lastSpeechId, int limit) {
-        List<SpeechAnalysisResponseDto> speeches = speechCustomRepository.findNextSpeeches(userId, lastSpeechId, limit + 1) //hasNext를 알기 위해 +1을 해줍니다.
-                .stream()
-                .map(dto -> {
-                    String publicUrl = s3UploadPresignedUrlService.getPublicS3Url(dto.fileUrl());
-                    return new SpeechAnalysisResponseDto(
-                            dto.speechId(),
-                            dto.createdAt(),
-                            publicUrl, // fileUrl만 교체
-                            dto.content(),
-                            dto.summary(),
-                            dto.keywords(),
-                            dto.improvementPoints(),
-                            dto.logicalCoherenceScore(),
-                            dto.feedback(),
-                            dto.scoreExplanation(),
-                            dto.expectedQuestions()
-                    );
-                })
+        List<SpeechAnalysisResponseDto> speeches = speechCustomRepository.findNextSpeeches(userId, lastSpeechId, limit + 1);
+
+        return buildPagingResponse(speeches, limit);
+    }
+
+    @Transactional(readOnly = true)
+    public SpeechPagingResponseDto getAllSpeeches(Long userId, Long lastSpeechId, int limit) {
+        List<SpeechAnalysisResponseDto> speeches = speechCustomRepository.findAllNextSpeeches(userId, lastSpeechId, limit + 1);
+
+        return buildPagingResponse(speeches, limit);
+    }
+
+    private SpeechPagingResponseDto buildPagingResponse(List<SpeechAnalysisResponseDto> speeches, int limit) {
+        // S3 public URL로 변환
+        List<SpeechAnalysisResponseDto> content = speeches.stream()
+                .map(dto -> new SpeechAnalysisResponseDto(
+                        dto.speechId(),
+                        dto.createdAt(),
+                        s3UploadPresignedUrlService.getPublicS3Url(dto.fileUrl()), // URL 변환
+                        dto.content(),
+                        dto.summary(),
+                        dto.keywords(),
+                        dto.improvementPoints(),
+                        dto.logicalCoherenceScore(),
+                        dto.feedback(),
+                        dto.scoreExplanation(),
+                        dto.expectedQuestions(),
+                        dto.isAnalyzed() // isAnalyzed 값 전달
+                ))
                 .collect(Collectors.toList());
 
-
-        boolean hasNext = speeches.size() > limit;
+        boolean hasNext = content.size() > limit;
         if (hasNext) {
-            speeches = speeches.subList(0, limit);
+            content.remove(limit); // 마지막 항목 제거
         }
 
-        CursorDto cursorDto = speeches.isEmpty() ?
-                null : new CursorDto(speeches.get(speeches.size() - 1).createdAt(), speeches.get(speeches.size() - 1).speechId());
+        CursorDto cursorDto = content.isEmpty() ?
+                null : new CursorDto(content.get(content.size() - 1).createdAt(), content.get(content.size() - 1).speechId());
 
         return SpeechPagingResponseDto.builder()
-                .speeches(speeches)
+                .speeches(content)
                 .hasNext(hasNext)
                 .cursordto(cursorDto)
                 .build();
@@ -279,4 +289,7 @@ public class SpeechService {
         );
         return SpeechIdDto.of(speechId);
     }
+
+
+
 }

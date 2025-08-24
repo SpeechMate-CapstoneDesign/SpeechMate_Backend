@@ -13,7 +13,7 @@ public record SpeechAnalysisResponseDto(
         int logicalCoherenceScore,
         String feedback,
         String scoreExplanation,
-        String expectedQuestions
-
+        String expectedQuestions,
+        boolean isAnalyzed
 ) {
 }

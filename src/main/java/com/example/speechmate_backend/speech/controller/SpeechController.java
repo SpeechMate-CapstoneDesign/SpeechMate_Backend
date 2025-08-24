@@ -6,6 +6,7 @@ import com.example.speechmate_backend.s3.MediaFileExtension;
 import com.example.speechmate_backend.s3.controller.dto.VoiceKeyDto;
 import com.example.speechmate_backend.s3.controller.dto.VoiceRecordDto;
 import com.example.speechmate_backend.speech.controller.dto.SpeechIdDto;
+import com.example.speechmate_backend.speech.controller.dto.SpeechMetadataRequestDto;
 import com.example.speechmate_backend.speech.controller.dto.SpeechPagingResponseDto;
 import com.example.speechmate_backend.speech.controller.dto.SpeechResultDto;
 import com.example.speechmate_backend.speech.service.SpeechService;
@@ -13,6 +14,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -87,7 +89,7 @@ public class SpeechController {
         return ResponseEntity.ok(ApiResponse.ok(speechId));
     }
 
-    @Operation(summary = "speech 조회", description = "클라이언트가 분석된 스피치들을 조회합니다.")
+    @Operation(summary = "분석된 speech 조회", description = "클라이언트가 분석된 스피치들을 조회합니다.")
     @GetMapping("/mine")
     public ResponseEntity<ApiResponse<SpeechPagingResponseDto>> getSpeeches(
             @RequestParam(required = false) Long lastSpeechId,
@@ -96,6 +98,17 @@ public class SpeechController {
     ) {
         Long userId = userDetails.getUserId(); // 인증 유저 ID
         SpeechPagingResponseDto response = speechService.getNextSpeeches(userId, lastSpeechId, limit);
+        return ResponseEntity.ok(ApiResponse.ok(response));
+    }
+
+    @Operation(summary = "모든 speech 조회", description = "클라이언트가 모든 스피치를 조회합니다.")
+    @GetMapping()
+    public ResponseEntity<ApiResponse<SpeechPagingResponseDto>> getAllSpeeches(
+            @RequestParam(required = false) Long lastSpeechId,
+            @RequestParam(defaultValue = "5") int limit,
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        SpeechPagingResponseDto response = speechService.getAllSpeeches(userDetails.getUserId(),lastSpeechId, limit);
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 

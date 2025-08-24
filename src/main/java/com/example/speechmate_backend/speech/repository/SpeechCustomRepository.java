@@ -8,4 +8,6 @@ import java.util.List;
 @Repository
 public interface SpeechCustomRepository {
     List<SpeechAnalysisResponseDto> findNextSpeeches(Long userId, Long lastSpeechId, int limit);
+
+    List<SpeechAnalysisResponseDto> findAllNextSpeeches(Long userId, Long lastSpeechId, int limit);
 }

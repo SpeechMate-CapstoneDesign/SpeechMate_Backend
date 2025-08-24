@@ -90,7 +90,7 @@ public class SpeechController {
     }
 
     @Operation(summary = "분석된 speech 조회", description = "클라이언트가 분석된 스피치들을 조회합니다.")
-    @GetMapping("/mine")
+    @GetMapping("/mineAnalyzed")
     public ResponseEntity<ApiResponse<SpeechPagingResponseDto>> getSpeeches(
             @RequestParam(required = false) Long lastSpeechId,
             @RequestParam(defaultValue = "5") int limit,
@@ -102,7 +102,7 @@ public class SpeechController {
     }
 
     @Operation(summary = "모든 speech 조회", description = "클라이언트가 모든 스피치를 조회합니다.")
-    @GetMapping()
+    @GetMapping("/mineAll")
     public ResponseEntity<ApiResponse<SpeechPagingResponseDto>> getAllSpeeches(
             @RequestParam(required = false) Long lastSpeechId,
             @RequestParam(defaultValue = "5") int limit,

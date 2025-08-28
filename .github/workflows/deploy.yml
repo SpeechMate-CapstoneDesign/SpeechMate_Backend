@@ -63,10 +63,11 @@ jobs:
             echo "${{ secrets.ENV_VARS }}" > ./.env
             
             
-            echo "🧹 Cleaning up existing containers and volumes..."
+            echo "🧹 기존 컨테이너 중지 및 삭제 중..."
             docker compose down -v 
-            docker container prune -f 
-            docker volume prune -f 
+            
+            echo "🧹 사용하지 않는 모든 이미지 삭제중..."
+            docker image prune -a -f 
 
             docker compose pull
             docker compose up -d

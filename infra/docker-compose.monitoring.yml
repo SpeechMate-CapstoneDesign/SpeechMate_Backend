@@ -1,0 +1,58 @@
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - /home/ubuntu/capstone/conf/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - capstone-net
+    restart: always
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+    networks:
+      - capstone-net
+    restart: always
+    depends_on:
+      - prometheus
+
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    command: -config.file=/mnt/config/config.yml
+    volumes:
+      - /home/ubuntu/capstone/conf/loki-config.yml:/mnt/config/config.yml:ro
+    ports:
+      - "3100:3100"
+    networks:
+      - capstone-net
+    restart: always
+
+  promtail:
+    container_name: promtail
+    image: grafana/promtail:latest
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - /home/ubuntu/capstone/conf/promtail-config.yml:/etc/promtail/config.yml
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - capstone-net
+    restart: always
+    depends_on:
+      - loki
+
+networks:
+  capstone-net:
+    external: true
+    name: capstone_capstone-net  # 기본적으로 파일이름_우리가 정한 네트워크이름 이렇게 네트워크이름이 정해져버림.
+
+volumes:
+  grafana-data:

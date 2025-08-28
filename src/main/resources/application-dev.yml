@@ -51,3 +51,12 @@ oauth:
     redirect-uri: http://localhost:8080/api/auth/test
     base-url: https://kauth.kakao.com
     app-key: ${KAKAO_APP_KEY}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*" # open 할 actuator 경로 설정
+  endpoint:
+    health:
+      show-details: always

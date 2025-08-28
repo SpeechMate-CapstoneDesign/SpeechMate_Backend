@@ -37,6 +37,7 @@ public class SecurityConfig {
                                 "/v3/api-docs/**", // OpenAPI 3 문서 JSON
                                 "/swagger-resources/**", // Swagger 리소스
                                 "/webjars/**" // Swagger UI 정적 리소스
+                                , "/actuator/**"
                         ).permitAll()
                         .anyRequest().authenticated());
 

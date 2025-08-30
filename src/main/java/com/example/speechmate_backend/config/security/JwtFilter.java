@@ -55,7 +55,6 @@ public class JwtFilter extends OncePerRequestFilter {
         } catch (ExpiredJwtException e){
             log.error("만료된 JwtException이 JwtFilter에서 잡혔습니다: {}", e.getMessage(), e); // 예외 메시지와 스택 트레이스 로깅
 
-            // **** 이 부분이 핵심입니다. 직접 응답을 내려야 합니다. ****
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED); // 401 Unauthorized
             response.setContentType("application/json;charset=UTF-8"); // JSON 응답을 위한 Content-Type 설정
 
@@ -68,14 +67,12 @@ public class JwtFilter extends OncePerRequestFilter {
             log.info("만료된 토큰으로 인해 401 Unauthorized 응답을 직접 보냈습니다. URI: {}, 응답 본문: {}", uri, errorResponseJson);
             return; // **** 필터 체인 진행 중단 ****
         } catch (Exception e) { // JWT 관련 다른 예외도 잡아서 처리할 수 있습니다.
-            log.error("JWT 토큰 처리 중 예상치 못한 오류가 발생했습니다: {}", e.getMessage(), e);
-            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            log.error("Invalid JWT Token. URI: {}", request.getRequestURI(), e);
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED); // 401
             response.setContentType("application/json;charset=UTF-8");
             PrintWriter writer = response.getWriter();
-            String errorResponseJson = "{\"code\":500,\"message\":\"Internal server error during token validation\"}";
-            writer.print(errorResponseJson);
+            writer.print("{\"code\":401,\"message\":\"invalid token\"}");
             writer.flush();
-            log.error("예상치 못한 JWT 처리 오류로 인해 500 Internal Server Error 응답을 직접 보냈습니다. URI: {}, 응답 본문: {}", uri, errorResponseJson);
             return;
         }
 

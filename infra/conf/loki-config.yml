@@ -5,6 +5,11 @@ server:
   # 최신 Loki 버전과의 호환성을 위해
 limits_config:
   allow_structured_metadata: false
+#오래된 데이터를 삭제하는 작업 공간과 보관 기간을 설정
+compactor:
+  working_directory: /data/loki/compactor
+  shared_store: filesystem
+  retention_enabled: true
 
 common:
   path_prefix: /tmp/loki
@@ -28,5 +33,10 @@ schema_config:
         prefix: index_
         period: 24h
 
+
+# 보관 주기를 14일(336시간)로 설정
+table_manager:
+  retention_deletes_enabled: true
+  retention_period: 336h
 ruler:
   alertmanager_url: http://localhost:9093

@@ -26,6 +26,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.File;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 
@@ -212,12 +213,16 @@ public class SpeechService {
     }
 
     @Transactional
-    public SpeechIdDto registerUploadedSpeech(Long userId, String fileKey) {
+    public SpeechIdDto registerUploadedSpeech(Long userId, String fileKey, Long durationSeconds) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> UserNotFoundException.EXCEPTION);
 
         Speech speech = new Speech();
         speech.setFileUrl(fileKey); // 실제 s3 key
+
+        String mediaType = fileKey.toLowerCase().endsWith(".mp4") || fileKey.toLowerCase().endsWith(".mov") ? "VIDEO" : "AUDIO";
+        speech.updateMediaInfo(durationSeconds, mediaType);
+
         user.addSpeech(speech);
         speechRepository.save(speech);
 
@@ -292,4 +297,11 @@ public class SpeechService {
 
 
 
+    public SpeechResultDto getSpeechById(Long speechId) {
+        Speech speech = speechRepository.findById(speechId).orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
+
+        SpeechResultDto dto = SpeechResultDto.fromE(speech);
+        return dto;
+
+    }
 }

@@ -15,7 +15,10 @@ public record AnalysisResultDto(
 ) {
 
 
-    public static AnalysisResultDto from(com.example.speechmate_backend.speech.domain.AnalysisResult entity) {
+    public static AnalysisResultDto from(AnalysisResult entity) {
+        if (entity == null) {
+            return null;
+        }
         return AnalysisResultDto.builder()
                 .summary(entity.getSummary())
                 .keywords(entity.getKeywords())

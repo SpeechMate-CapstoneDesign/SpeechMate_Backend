@@ -28,6 +28,14 @@ public class Speech extends BaseEntity {
 
     private String location; // 장소
 
+    private Long duration; // 파일 재생 시간 (초 단위)
+    private String fileType; // 파일 타입(m4a, wav면 audio, mp4면 video)
+
+    public void updateMediaInfo(Long duration, String fileType) {
+        this.duration = duration;
+        this.fileType = fileType;
+    }
+
     public void updateMetadata(String title, String presentationContext, String audience, String location) {
         this.title = title;
         this.presentationContext = presentationContext;
@@ -55,6 +63,10 @@ public class Speech extends BaseEntity {
     public void setUser(User user) {
         this.user = user;
     }
+
+    public void setDuration(Long duration) {this.duration = duration; };
+
+    public void setFileType(String fileType) {this.fileType = fileType; };
 
     public void setAnalysisResult(AnalysisResult analysisResult) {
         this.analysisResult = analysisResult;

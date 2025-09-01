@@ -83,9 +83,10 @@ public class SpeechController {
     @PostMapping("/s3-callback")
     public ResponseEntity<ApiResponse<SpeechIdDto>> callbackAfterUpload(
             @AuthenticationPrincipal CustomUserDetails customUserDetails,
-            @RequestParam String fileKey
+            @RequestParam String fileKey,
+            @RequestParam Long durationSeconds
     ) {
-        SpeechIdDto speechId = speechService.registerUploadedSpeech(customUserDetails.getUserId(), fileKey);
+        SpeechIdDto speechId = speechService.registerUploadedSpeech(customUserDetails.getUserId(), fileKey, durationSeconds);
         return ResponseEntity.ok(ApiResponse.ok(speechId));
     }
 
@@ -122,6 +123,12 @@ public class SpeechController {
         return ResponseEntity.ok(ApiResponse.ok(speechService.addMetadataToSpeech(speechId, requestDto, userDetails.getUserId())));
     }
 
+    @GetMapping("/{speechId}")
+    public ResponseEntity<ApiResponse<SpeechResultDto>> getSpeechById(
+            @PathVariable Long speechId
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(speechService.getSpeechById(speechId)));
+    }
 
 
 

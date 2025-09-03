@@ -7,6 +7,8 @@ public record SpeechIdDto(
         Long speechId
 ) {
     public static SpeechIdDto of(Long speechId) {
-        return SpeechIdDto.builder().speechId(speechId).build();
+        return SpeechIdDto.builder()
+                .speechId(speechId)
+                .build();
     }
 }

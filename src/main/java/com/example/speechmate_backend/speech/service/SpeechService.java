@@ -4,7 +4,6 @@ import com.example.speechmate_backend.common.ApiResponse;
 import com.example.speechmate_backend.common.exception.*;
 import com.example.speechmate_backend.s3.MediaFileExtension;
 import com.example.speechmate_backend.s3.controller.dto.VoiceKeyDto;
-import com.example.speechmate_backend.s3.controller.dto.VoiceRecordDto;
 import com.example.speechmate_backend.s3.service.S3UploadPresignedUrlService;
 import com.example.speechmate_backend.speech.controller.SpeechRestClient;
 import com.example.speechmate_backend.speech.controller.dto.*;
@@ -17,16 +16,12 @@ import com.example.speechmate_backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
 import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 
@@ -172,7 +167,7 @@ public class SpeechService {
         }
     }
 
-    public ResponseEntity<ApiResponse<String>> transcribeversionFromS3(Long speechId) {
+    public SpeechContentResponse transcribeversionFromS3(Long speechId) {
         try {
             Speech speech = speechRepository.findById(speechId)
                     .orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
@@ -190,7 +185,7 @@ public class SpeechService {
             speech.setContent(content);
             speechRepository.save(speech);
 
-            return ResponseEntity.ok(ApiResponse.ok(content));
+            return SpeechContentResponse.of(content);
         } catch (Exception e) {
             throw new RuntimeException("Whisper 변환 실패: " + e.getMessage(), e);
         }
@@ -213,7 +208,7 @@ public class SpeechService {
     }
 
     @Transactional
-    public SpeechIdDto registerUploadedSpeech(Long userId, String fileKey, Long durationSeconds) {
+    public SpeechS3CallbackDto registerUploadedSpeech(Long userId, String fileKey, Long durationSeconds) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> UserNotFoundException.EXCEPTION);
 
@@ -225,8 +220,8 @@ public class SpeechService {
 
         user.addSpeech(speech);
         speechRepository.save(speech);
-
-        return SpeechIdDto.of(speech.getId());
+        String s3Url = s3UploadPresignedUrlService.getPublicS3Url(speech.getFileUrl());
+        return SpeechS3CallbackDto.of(speech.getId(), s3Url);
     }
 
     @Transactional(readOnly = true)
@@ -292,6 +287,8 @@ public class SpeechService {
                 requestDto.audience(),
                 requestDto.location()
         );
+
+
         return SpeechIdDto.of(speechId);
     }
 
@@ -302,6 +299,28 @@ public class SpeechService {
 
         SpeechResultDto dto = SpeechResultDto.fromE(speech);
         return dto;
+
+    }
+
+    public SpeechContentResponse getSpeechContentById(Long speechId) {
+        Speech speech = speechRepository.findById(speechId).orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
+
+        SpeechContentResponse dto = SpeechContentResponse.of(speech.getContent());
+        return dto;
+    }
+
+    public SpeechConfigDto getSpeechConfigById(Long speechId) {
+        Speech speech = speechRepository.findById(speechId).orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
+
+        SpeechConfigDto dto = SpeechConfigDto.from(speech);
+
+        return dto;
+    }
+
+    public AnalysisResultDto getSpeechContentAnalysisById(Long speechId) {
+        Speech speech = speechRepository.findById(speechId).orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
+
+        return AnalysisResultDto.from(speech.getAnalysisResult());
 
     }
 }

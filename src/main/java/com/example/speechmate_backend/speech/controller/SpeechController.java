@@ -4,24 +4,16 @@ import com.example.speechmate_backend.common.ApiResponse;
 import com.example.speechmate_backend.config.security.CustomUserDetails;
 import com.example.speechmate_backend.s3.MediaFileExtension;
 import com.example.speechmate_backend.s3.controller.dto.VoiceKeyDto;
-import com.example.speechmate_backend.s3.controller.dto.VoiceRecordDto;
-import com.example.speechmate_backend.speech.controller.dto.SpeechIdDto;
-import com.example.speechmate_backend.speech.controller.dto.SpeechMetadataRequestDto;
-import com.example.speechmate_backend.speech.controller.dto.SpeechPagingResponseDto;
-import com.example.speechmate_backend.speech.controller.dto.SpeechResultDto;
+import com.example.speechmate_backend.speech.controller.dto.*;
 import com.example.speechmate_backend.speech.service.SpeechService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
 @Tag(name = "스피치 분석", description = "스피치 파일 업로드 및 분석")
 @RequestMapping("/api/speech")
@@ -72,21 +64,21 @@ public class SpeechController {
 
     @Operation(summary = "2-1. whisper api s3에서 받아온것", description = "저장된 s3 파일로부터 stt로변환된 내용을 뽑아냅니다.(1을 먼저 선행하여 s3에 파일 저장후 요청해주세요")
     @PostMapping(value = "/Whisperstt3/{speechId}")
-    public ResponseEntity<ApiResponse<String>> transcribes3(
+    public ResponseEntity<ApiResponse<SpeechContentResponse>> transcribes3(
             @Parameter(description = "stt변환을 진행할 speechId", required = true)
             @PathVariable Long speechId) {
-        return speechService.transcribeversionFromS3(speechId);
+        return ResponseEntity.ok(ApiResponse.ok(speechService.transcribeversionFromS3(speechId)));
     }
 
 
     @Operation(summary = "1-1. 업로드 완료 콜백", description = "클라이언트가 presigned url로 업로드 완료한 후 콜백 합니다.")
     @PostMapping("/s3-callback")
-    public ResponseEntity<ApiResponse<SpeechIdDto>> callbackAfterUpload(
+    public ResponseEntity<ApiResponse<SpeechS3CallbackDto>> callbackAfterUpload(
             @AuthenticationPrincipal CustomUserDetails customUserDetails,
             @RequestParam String fileKey,
             @RequestParam Long durationSeconds
     ) {
-        SpeechIdDto speechId = speechService.registerUploadedSpeech(customUserDetails.getUserId(), fileKey, durationSeconds);
+        SpeechS3CallbackDto speechId = speechService.registerUploadedSpeech(customUserDetails.getUserId(), fileKey, durationSeconds);
         return ResponseEntity.ok(ApiResponse.ok(speechId));
     }
 
@@ -130,6 +122,26 @@ public class SpeechController {
         return ResponseEntity.ok(ApiResponse.ok(speechService.getSpeechById(speechId)));
     }
 
+    @GetMapping("/{speechId}/speechConfig")
+    public ResponseEntity<ApiResponse<SpeechConfigDto>> getSpeechConfigById(
+            @PathVariable Long speechId
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(speechService.getSpeechConfigById(speechId)));
+    }
+
+    @GetMapping("/{speechId}/content")
+    public ResponseEntity<ApiResponse<SpeechContentResponse>> getSpeechContnetById(
+            @PathVariable Long speechId
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(speechService.getSpeechContentById(speechId)));
+    }
+
+    @GetMapping("/{speechId}/contentAnalysis")
+    public ResponseEntity<ApiResponse<AnalysisResultDto>> getSpeechContentAnalysisById(
+            @PathVariable Long speechId
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(speechService.getSpeechContentAnalysisById(speechId)));
+    }
 
 
 }

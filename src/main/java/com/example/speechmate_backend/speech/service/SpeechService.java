@@ -5,6 +5,7 @@ import com.example.speechmate_backend.common.exception.*;
 import com.example.speechmate_backend.s3.MediaFileExtension;
 import com.example.speechmate_backend.s3.controller.dto.VoiceKeyDto;
 import com.example.speechmate_backend.s3.service.S3UploadPresignedUrlService;
+import com.example.speechmate_backend.speech.controller.SortType;
 import com.example.speechmate_backend.speech.controller.SpeechRestClient;
 import com.example.speechmate_backend.speech.controller.dto.*;
 import com.example.speechmate_backend.speech.domain.AnalysisResult;

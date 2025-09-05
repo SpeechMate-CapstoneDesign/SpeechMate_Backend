@@ -16,10 +16,11 @@ public enum ErrorCode implements ErrorCodeIfs{
     USER_NOT_FOUND("fail", HttpStatus.SC_NOT_FOUND, "존재하지 않는 유저"),
     SPEECH_CONTENT_ALREADY_EXIST("fail", HttpStatus.SC_CONFLICT, "stt로 변환된 content가 이미 존재."),
     SPEECH_CONTENT_NOT_EXIST("fail", HttpStatus.SC_CONFLICT, "stt로 변환된 content가 존재X"),
-    SPEECH_ANALYSIS_RESULT_ALREADY_EXIST("fail", HttpStatus.SC_CONFLICT, "ai로 분석된 analysisREsult가 이미 존재."),
+    SPEECH_ANALYSIS_RESULT_ALREADY_EXIST("fail", HttpStatus.SC_CONFLICT, "ai로 분석된 analysisResult가 이미 존재."),
     SPEECH_FILE_KEY_DOES_NOT_EQUAL("fail", HttpStatus.SC_BAD_REQUEST, "파일 키가 저장된 것과 일치하지 않음"),
     SPEECH_FILE_KEY_NOT_FOUND("fail", HttpStatus.SC_NOT_FOUND, "파일키가 없음"),
-    WHISPER_EXCEPTION("fail", HttpStatus.SC_INTERNAL_SERVER_ERROR, "stt를 받아오는 whisper과정에서 오류 발생");
+    WHISPER_EXCEPTION("fail", HttpStatus.SC_INTERNAL_SERVER_ERROR, "stt를 받아오는 whisper과정에서 오류 발생"),
+    USER_NOT_MATCH("fail", HttpStatus.SC_FORBIDDEN, "현재 로그인 한 유저가 일치하지 않습니다.");
 
 
     private final String status;

@@ -1,6 +1,7 @@
 package com.example.speechmate_backend.speech.controller.dto;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 public record SpeechAnalysisResponseDto(
         Long speechId,
@@ -9,11 +10,9 @@ public record SpeechAnalysisResponseDto(
         String content,
         String summary,
         String keywords,
-        String improvementPoints,
-        int logicalCoherenceScore,
+        List<String> improvementPoints,
         String feedback,
-        String scoreExplanation,
-        String expectedQuestions
-
+        List<String> expectedQuestions,
+        boolean isAnalyzed
 ) {
 }

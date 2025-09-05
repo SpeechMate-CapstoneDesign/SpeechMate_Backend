@@ -16,11 +16,14 @@ import com.example.speechmate_backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -85,7 +88,7 @@ public class SpeechService {
             speech.setAnalysisResult(result);
             speechRepository.save(speech);
             String fileUrl = s3UploadPresignedUrlService.getPublicS3Url(speech.getFileUrl());
-            log.info("[AI 분석 성공] Speech ID {} 논리 점수: {}", speechId, result.getLogicalCoherenceScore());
+            //log.info("[AI 분석 성공] Speech ID {} 논리 점수: {}", speechId, result.getLogicalCoherenceScore());
             return SpeechResultDto.from(speech, fileUrl);
         } catch (Exception e) {
             log.error("[AI 분석 실패] Speech ID {}: {}", speechId, e.getMessage(), e);
@@ -134,7 +137,7 @@ public class SpeechService {
     public ResponseEntity<ApiResponse<String>> callWhisperStt(MultipartFile file, Long speechId) {
         Speech speech = speechRepository.findById(speechId)
                 .orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
-        if(speech.getContent() != null && !speech.getContent().isEmpty()) {
+        if (speech.getContent() != null && !speech.getContent().isEmpty()) {
             throw SpeechContentAlreadyExistException.EXCEPTION;
         }
         try {
@@ -152,7 +155,7 @@ public class SpeechService {
         try {
             Speech speech = speechRepository.findById(speechId)
                     .orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
-            if(speech.getContent() != null && !speech.getContent().isEmpty()) {
+            if (speech.getContent() != null && !speech.getContent().isEmpty()) {
                 throw SpeechContentAlreadyExistException.EXCEPTION;
             }
 
@@ -171,8 +174,8 @@ public class SpeechService {
         try {
             Speech speech = speechRepository.findById(speechId)
                     .orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
-            if(speech.getContent() != null && !speech.getContent().isEmpty()) {
-                throw SpeechContentAlreadyExistException.EXCEPTION;
+            if (speech.getContent() != null && !speech.getContent().isEmpty()) {
+                return SpeechContentResponse.of(speech.getContent());
             }
 
             String fileKeyFromDb = speech.getFileUrl();
@@ -191,8 +194,6 @@ public class SpeechService {
         }
 
     }
-
-
 
 
     @Transactional
@@ -225,102 +226,215 @@ public class SpeechService {
     }
 
     @Transactional(readOnly = true)
-    public SpeechPagingResponseDto getNextSpeeches(Long userId, Long lastSpeechId, int limit) {
-        List<SpeechAnalysisResponseDto> speeches = speechCustomRepository.findNextSpeeches(userId, lastSpeechId, limit + 1);
+    public SpeechPagingResponseDto getAnalyzedSpeeches(Long userId, Long lastSpeechId, int limit) {
+        Pageable pageable = PageRequest.of(0, limit + 1); // hasNext 체크용
 
-        return buildPagingResponse(speeches, limit);
-    }
+        List<Speech> speeches = speechRepository.findAnalyzedSpeeches(userId, lastSpeechId, pageable);
 
-    @Transactional(readOnly = true)
-    public SpeechPagingResponseDto getAllSpeeches(Long userId, Long lastSpeechId, int limit) {
-        List<SpeechAnalysisResponseDto> speeches = speechCustomRepository.findAllNextSpeeches(userId, lastSpeechId, limit + 1);
+        boolean hasNext = speeches.size() > limit;
+        if (hasNext) speeches = speeches.subList(0, limit);
 
-        return buildPagingResponse(speeches, limit);
-    }
-
-    private SpeechPagingResponseDto buildPagingResponse(List<SpeechAnalysisResponseDto> speeches, int limit) {
-        // S3 public URL로 변환
-        List<SpeechAnalysisResponseDto> content = speeches.stream()
-                .map(dto -> new SpeechAnalysisResponseDto(
-                        dto.speechId(),
-                        dto.createdAt(),
-                        s3UploadPresignedUrlService.getPublicS3Url(dto.fileUrl()), // URL 변환
-                        dto.content(),
-                        dto.summary(),
-                        dto.keywords(),
-                        dto.improvementPoints(),
-                        dto.logicalCoherenceScore(),
-                        dto.feedback(),
-                        dto.scoreExplanation(),
-                        dto.expectedQuestions(),
-                        dto.isAnalyzed() // isAnalyzed 값 전달
-                ))
+        List<SpeechAnalysisResponseDto> dtoList = speeches.stream()
+                .map(speech -> {
+                    var ar = speech.getAnalysisResult();
+                    String s3Url = s3UploadPresignedUrlService.getPublicS3Url(speech.getFileUrl());
+                    return new SpeechAnalysisResponseDto(
+                            speech.getId(),
+                            speech.getCreatedAt(),
+                            s3Url,
+                            speech.getContent(),
+                            ar.getSummary(),
+                            ar.getKeywords(),
+                            ar.getImprovementPoints(),
+                            ar.getFeedback(),
+                            ar.getExpectedQuestions(),
+                            true
+                    );
+                })
                 .collect(Collectors.toList());
 
-        boolean hasNext = content.size() > limit;
-        if (hasNext) {
-            content.remove(limit); // 마지막 항목 제거
-        }
-
-        CursorDto cursorDto = content.isEmpty() ?
-                null : new CursorDto(content.get(content.size() - 1).createdAt(), content.get(content.size() - 1).speechId());
+        CursorDto cursorDto = dtoList.isEmpty() ? null :
+                new CursorDto(
+                        dtoList.get(dtoList.size() - 1).createdAt(),
+                        dtoList.get(dtoList.size() - 1).speechId()
+                );
 
         return SpeechPagingResponseDto.builder()
-                .speeches(content)
+                .speeches(dtoList)
                 .hasNext(hasNext)
                 .cursordto(cursorDto)
                 .build();
     }
 
-    @Transactional
-    public SpeechIdDto addMetadataToSpeech(Long speechId, SpeechMetadataRequestDto requestDto, Long userId) {
-        Speech speech = speechRepository.findById(speechId)
-                .orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
 
-        if (!speech.getUser().getId().equals(userId)) {
-            throw UserNotMatchException.EXCEPTION;
+    @Transactional(readOnly = true)
+    public SpeechPagingResponseDto getAllSpeeches(Long userId, Long lastSpeechId, int limit) {
+        Pageable pageable = PageRequest.of(0, limit + 1); // hasNext 체크용으로 +1 조회
+
+        List<Speech> speeches = speechRepository.findAllSpeechesWithAnalysis(userId, pageable);
+
+        // 커서 기반 페이징
+        if (lastSpeechId != null) {
+            speeches = speeches.stream()
+                    .filter(s -> s.getId() < lastSpeechId)
+                    .collect(Collectors.toList());
         }
 
-        speech.updateMetadata(
-                requestDto.title(),
-                requestDto.presentationContext(),
-                requestDto.audience(),
-                requestDto.location()
+        boolean hasNext = speeches.size() > limit;
+        if (hasNext) speeches = speeches.subList(0, limit);
+
+        List<SpeechAnalysisResponseDto> dtoList = speeches.stream()
+                .map(speech -> {
+                    var ar = speech.getAnalysisResult();
+                    String s3Url = s3UploadPresignedUrlService.getPublicS3Url(speech.getFileUrl());
+                    return new SpeechAnalysisResponseDto(
+                            speech.getId(),
+                            speech.getCreatedAt(),
+                            s3Url,
+                            speech.getContent(),
+                            ar != null ? ar.getSummary() : null,
+                            ar != null ? ar.getKeywords() : null,
+                            ar != null ? ar.getImprovementPoints() : Collections.emptyList(),
+                            ar != null ? ar.getFeedback() : null,
+                            ar != null ? ar.getExpectedQuestions() : Collections.emptyList(),
+                            ar != null
+                    );
+                })
+                .collect(Collectors.toList());
+
+        // 마지막 스피치 id를 커서로 사용
+        CursorDto cursorDto = dtoList.isEmpty()
+                ? null
+                : new CursorDto(dtoList.get(dtoList.size() - 1).createdAt(),
+                dtoList.get(dtoList.size() - 1).speechId()
         );
 
-
-        return SpeechIdDto.of(speechId);
+        return SpeechPagingResponseDto.builder()
+                .speeches(dtoList)
+                .hasNext(hasNext)
+                .cursordto(cursorDto)
+                .build();
     }
 
 
+private SpeechPagingResponseDto buildPagingResponse(List<SpeechAnalysisResponseDto> speeches, int limit) {
+    // S3 public URL로 변환
+    List<SpeechAnalysisResponseDto> content = speeches.stream()
+            .map(dto -> new SpeechAnalysisResponseDto(
+                    dto.speechId(),
+                    dto.createdAt(),
+                    s3UploadPresignedUrlService.getPublicS3Url(dto.fileUrl()), // URL 변환
+                    dto.content(),
+                    dto.summary(),
+                    dto.keywords(),
+                    dto.improvementPoints(),
+                    dto.feedback(),
+                    dto.expectedQuestions(),
+                    dto.isAnalyzed() // isAnalyzed 값 전달
+            ))
+            .collect(Collectors.toList());
 
-    public SpeechResultDto getSpeechById(Long speechId) {
-        Speech speech = speechRepository.findById(speechId).orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
-
-        SpeechResultDto dto = SpeechResultDto.fromE(speech);
-        return dto;
-
+    boolean hasNext = content.size() > limit;
+    if (hasNext) {
+        content.remove(limit); // 마지막 항목 제거
     }
 
-    public SpeechContentResponse getSpeechContentById(Long speechId) {
-        Speech speech = speechRepository.findById(speechId).orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
+    CursorDto cursorDto = content.isEmpty() ?
+            null : new CursorDto(content.get(content.size() - 1).createdAt(), content.get(content.size() - 1).speechId());
 
-        SpeechContentResponse dto = SpeechContentResponse.of(speech.getContent());
-        return dto;
+    return SpeechPagingResponseDto.builder()
+            .speeches(content)
+            .hasNext(hasNext)
+            .cursordto(cursorDto)
+            .build();
+}
+
+@Transactional(readOnly = true)
+public SpeechPagingFeedDto getMySpeecheFeed(Long userId, Long lastSpeechId, int limit, SortType sortType) {
+    List<SpeechFeedDto> rawDtos = speechCustomRepository.findMyFeed(userId, lastSpeechId, limit + 1, sortType);
+
+    List<SpeechFeedDto> processedDtos = rawDtos.stream()
+            .map(dto -> new SpeechFeedDto(
+                    dto.id(),
+                    dto.title(),
+                    dto.createdAt(),
+                    dto.fileType(),
+                    s3UploadPresignedUrlService.getPublicS3Url(dto.fileUrl()),
+                    dto.presentationContext(),
+                    dto.audience(),
+                    dto.location()
+            ))
+            .toList();
+
+    boolean hasNext = rawDtos.size() > limit;
+    if (hasNext) {
+        rawDtos.remove(limit);
     }
 
-    public SpeechConfigDto getSpeechConfigById(Long speechId) {
-        Speech speech = speechRepository.findById(speechId).orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
+    CursorDto cursorDto = rawDtos.isEmpty() ? null : new CursorDto(rawDtos.get(rawDtos.size() - 1).createdAt(), rawDtos.get(rawDtos.size() - 1).id());
 
-        SpeechConfigDto dto = SpeechConfigDto.from(speech);
+    // SpeechFeedDto의 createdAt 필드는 String이므로,
+    // 정렬 기준이 createdAt인 경우 CursorDto의 필드도 이에 맞춰 수정.
+    // 여기서는 ID만을 커서로 사용하는 간단한 방식 가정
 
-        return dto;
+    return SpeechPagingFeedDto.builder()
+            .speeches(processedDtos)
+            .hasNext(hasNext)
+            .cursordto(cursorDto)
+            .build();
+}
+
+
+@Transactional
+public SpeechIdDto addMetadataToSpeech(Long speechId, SpeechMetadataRequestDto requestDto, Long userId) {
+    Speech speech = speechRepository.findById(speechId)
+            .orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
+
+    if (!speech.getUser().getId().equals(userId)) {
+        throw UserNotMatchException.EXCEPTION;
     }
 
-    public AnalysisResultDto getSpeechContentAnalysisById(Long speechId) {
-        Speech speech = speechRepository.findById(speechId).orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
+    speech.updateMetadata(
+            requestDto.title(),
+            requestDto.presentationContext(),
+            requestDto.audience(),
+            requestDto.location()
+    );
 
-        return AnalysisResultDto.from(speech.getAnalysisResult());
 
-    }
+    return SpeechIdDto.of(speechId);
+}
+
+
+public SpeechResultDto getSpeechById(Long speechId) {
+    Speech speech = speechRepository.findById(speechId).orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
+    String s3Url = s3UploadPresignedUrlService.getPublicS3Url(speech.getFileUrl());
+
+    SpeechResultDto dto = SpeechResultDto.fromE(speech, s3Url);
+    return dto;
+
+}
+
+public SpeechContentResponse getSpeechContentById(Long speechId) {
+    Speech speech = speechRepository.findById(speechId).orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
+
+    SpeechContentResponse dto = SpeechContentResponse.of(speech.getContent());
+    return dto;
+}
+
+public SpeechConfigDto getSpeechConfigById(Long speechId) {
+    Speech speech = speechRepository.findById(speechId).orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
+    String s3Url = s3UploadPresignedUrlService.getPublicS3Url(speech.getFileUrl());
+    SpeechConfigDto dto = SpeechConfigDto.from(speech, s3Url);
+
+    return dto;
+}
+
+public AnalysisResultDto getSpeechContentAnalysisById(Long speechId) {
+    Speech speech = speechRepository.findById(speechId).orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
+
+
+    return AnalysisResultDto.from(speech.getAnalysisResult());
+
+}
 }

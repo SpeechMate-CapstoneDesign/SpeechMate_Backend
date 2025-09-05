@@ -9,15 +9,19 @@ public record SpeechConfigDto(
         String fileType,
         String presentationContext,
         String audience,
-        String location
+        String location,
+        String createdAt,
+        String fileUrl
 ) {
-    public static SpeechConfigDto from(Speech speech) {
+    public static SpeechConfigDto from(Speech speech, String s3Url) {
         return SpeechConfigDto.builder()
                 .duration(speech.getDuration())
                 .fileType(speech.getFileType())
                 .presentationContext(speech.getPresentationContext())
                 .audience(speech.getAudience())
                 .location(speech.getLocation())
+                .createdAt(speech.getCreatedAt().toString())
+                .fileUrl(s3Url)
                 .build();
     }
 }

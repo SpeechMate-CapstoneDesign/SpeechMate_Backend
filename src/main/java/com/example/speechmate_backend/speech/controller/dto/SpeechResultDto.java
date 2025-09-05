@@ -32,7 +32,7 @@ public record SpeechResultDto(
                 .build();
     }
 
-    public static SpeechResultDto fromE(Speech speech) {
+    public static SpeechResultDto fromE(Speech speech, String s3Url) {
         AnalysisResultDto analysisResultDto = null;
         if (speech.getAnalysisResult() != null) {
             analysisResultDto = AnalysisResultDto.from(speech.getAnalysisResult());
@@ -41,7 +41,7 @@ public record SpeechResultDto(
         return SpeechResultDto.builder()
                 .id(speech.getId())
                 .sttContent(speech.getContent())
-                .fileUrl(speech.getFileUrl())
+                .fileUrl(s3Url)
                 .title(speech.getTitle())
                 .presentationContext(speech.getPresentationContext())
                 .audience(speech.getAudience())

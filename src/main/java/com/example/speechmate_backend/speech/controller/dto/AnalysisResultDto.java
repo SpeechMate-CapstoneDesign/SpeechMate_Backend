@@ -3,14 +3,14 @@ package com.example.speechmate_backend.speech.controller.dto;
 import com.example.speechmate_backend.speech.domain.AnalysisResult;
 import lombok.Builder;
 
+import java.util.List;
+
 @Builder
 public record AnalysisResultDto(
         String summary,
         String keywords,
-        String improvementPoints,
-        int logicalCoherenceScore,
-        String scoreExplanation,
-        String expectedQuestions,
+        List<String> improvementPoints,
+        List<String> expectedQuestions,
         String feedback
 ) {
 
@@ -23,8 +23,6 @@ public record AnalysisResultDto(
                 .summary(entity.getSummary())
                 .keywords(entity.getKeywords())
                 .improvementPoints(entity.getImprovementPoints())
-                .logicalCoherenceScore(entity.getLogicalCoherenceScore())
-                .scoreExplanation(entity.getScoreExplanation())
                 .expectedQuestions(entity.getExpectedQuestions())
                 .feedback(entity.getFeedback())
                 .build();

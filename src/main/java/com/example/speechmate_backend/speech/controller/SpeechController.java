@@ -90,7 +90,7 @@ public class SpeechController {
             @AuthenticationPrincipal CustomUserDetails userDetails
     ) {
         Long userId = userDetails.getUserId(); // 인증 유저 ID
-        SpeechPagingResponseDto response = speechService.getNextSpeeches(userId, lastSpeechId, limit);
+        SpeechPagingResponseDto response = speechService.getAnalyzedSpeeches(userId, lastSpeechId, limit);
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
@@ -115,6 +115,7 @@ public class SpeechController {
         return ResponseEntity.ok(ApiResponse.ok(speechService.addMetadataToSpeech(speechId, requestDto, userDetails.getUserId())));
     }
 
+    @Operation(summary = "단일 스피치 조회")
     @GetMapping("/{speechId}")
     public ResponseEntity<ApiResponse<SpeechResultDto>> getSpeechById(
             @PathVariable Long speechId
@@ -141,6 +142,17 @@ public class SpeechController {
             @PathVariable Long speechId
     ) {
         return ResponseEntity.ok(ApiResponse.ok(speechService.getSpeechContentAnalysisById(speechId)));
+    }
+
+    @GetMapping("/myFeed")
+    public ResponseEntity<ApiResponse<SpeechPagingFeedDto>> getSpeechContentAnalysisById(
+            @RequestParam(required = false) Long lastSpeechId,
+            @RequestParam(defaultValue = "5") int limit,
+            @RequestParam(defaultValue = "LATEST") SortType sortType, // LATEST, OLDEST, NAME
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        SpeechPagingFeedDto dto = speechService.getMySpeecheFeed(userDetails.getUserId(), lastSpeechId, limit, sortType);
+        return ResponseEntity.ok(ApiResponse.ok(dto));
     }
 
 

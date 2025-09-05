@@ -8,6 +8,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 @Getter
@@ -31,21 +32,19 @@ public class AnalysisResult {
     @Column(columnDefinition = "TEXT")
     private String keywords;
 
-    @Column(columnDefinition = "TEXT")
-    private String improvementPoints;
+    @ElementCollection
+    @CollectionTable(name = "analysis_improvement_points", joinColumns = @JoinColumn(name = "analysis_result_id"))
+    @Column(name = "point")
+    private List<String> improvementPoints;
 
-    @Column
-    private int logicalCoherenceScore;
 
     @Column(columnDefinition = "TEXT")
     private String feedback;
 
-    @Column(columnDefinition = "TEXT")
-    private String scoreExplanation;
-
-    @Column(columnDefinition = "TEXT")
-    private String expectedQuestions;
-
+    @ElementCollection
+    @CollectionTable(name = "analysis_expected_questions", joinColumns = @JoinColumn(name = "analysis_result_id"))
+    @Column(name = "question")
+    private List<String> expectedQuestions;
 
 
     public void setSpeech(Speech speech) {
@@ -57,10 +56,8 @@ public class AnalysisResult {
                 .summary(dto.summary())
                 .keywords(dto.keywords())
                 .improvementPoints(dto.improvementPoints())
-                .scoreExplanation(dto.scoreExplanation())
                 .expectedQuestions(dto.expectedQuestions())
                 .feedback(dto.feedback())
-                .logicalCoherenceScore(dto.logicalCoherenceScore())
                 .build();
     }
 }

@@ -34,13 +34,10 @@ public class SpeechAnalysisResultService {
             지시사항:
             - summary: 핵심 내용을 3~4개의 문장으로 간결하게 요약하세요.
             - keywords: 텍스트의 핵심 단어 5개를 쉼표로 구분된 하나의 문자열로 제공하세요.
-            - improvementPoints: 개선점 3가지를 구체적으로 서술하세요.
-            - logicalCoherenceScore: 1~10 사이의 정수로 평가하세요.
-            - feedback: 발표의 부족한 부분에 대한 종합적인 피드백을 주세요.
-            - 결과는 반드시 아래에 명시된 JSON 형식으로만 응답해야 합니다. 다른 설명은 절대 추가하지 마세요.
-            - scoreExplanation: 위에서 준 점수에 대한 이유를 1~2문장으로 설명하세요.
-            - expectedQuestions: 청중이 발표를 들은 후 할 수 있는 질문을 3가지 예측해서 작성하세요.
+            - improvementPoints: 개선점 3가지를 구체적으로 서술하세요. 이 항목은 JSON 배열(List<String>)로 응답해야 합니다.
             - feedback: 발표 전체에 대한 종합적인 피드백을 작성하세요. 발표자의 강점과 약점을 균형 있게 다루세요.
+            - expectedQuestions: 청중이 발표를 들은 후 할 수 있는 질문을 3가지 예측해서 작성하세요. 이 항목은 JSON 배열(List<String>)로 응답해야 합니다.
+            - 결과는 반드시 아래에 명시된 JSON 형식으로만 응답해야 합니다. 다른 설명은 절대 추가하지 마세요.
             
             {format}
             """;

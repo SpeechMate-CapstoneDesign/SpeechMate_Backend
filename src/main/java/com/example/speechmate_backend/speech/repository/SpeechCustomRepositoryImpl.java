@@ -35,6 +35,7 @@ public class SpeechCustomRepositoryImpl implements SpeechCustomRepository{
                         speech.id,
                         speech.title,
                         speech.createdAt, // 문자열 변환
+                        speech.duration,
                         speech.fileType,
                         speech.FileUrl,
                         speech.presentationContext,

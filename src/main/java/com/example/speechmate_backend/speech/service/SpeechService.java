@@ -233,7 +233,14 @@ public class SpeechService {
         List<Speech> speeches = speechRepository.findAnalyzedSpeeches(userId, lastSpeechId, pageable);
 
         boolean hasNext = speeches.size() > limit;
-        if (hasNext) speeches = speeches.subList(0, limit);
+        CursorDto cursorDto = null;
+
+        if (hasNext) {
+            Speech nextCursorSpeech = speeches.get(limit-1);
+            cursorDto = new CursorDto(nextCursorSpeech.getCreatedAt(), nextCursorSpeech.getId());
+            speeches.remove(limit);
+        }
+
 
         List<SpeechAnalysisResponseDto> dtoList = speeches.stream()
                 .map(speech -> {
@@ -254,11 +261,6 @@ public class SpeechService {
                 })
                 .collect(Collectors.toList());
 
-        CursorDto cursorDto = dtoList.isEmpty() ? null :
-                new CursorDto(
-                        dtoList.get(dtoList.size() - 1).createdAt(),
-                        dtoList.get(dtoList.size() - 1).speechId()
-                );
 
         return SpeechPagingResponseDto.builder()
                 .speeches(dtoList)
@@ -272,17 +274,17 @@ public class SpeechService {
     public SpeechPagingResponseDto getAllSpeeches(Long userId, Long lastSpeechId, int limit) {
         Pageable pageable = PageRequest.of(0, limit + 1); // hasNext 체크용으로 +1 조회
 
-        List<Speech> speeches = speechRepository.findAllSpeechesWithAnalysis(userId, pageable);
-
-        // 커서 기반 페이징
-        if (lastSpeechId != null) {
-            speeches = speeches.stream()
-                    .filter(s -> s.getId() < lastSpeechId)
-                    .collect(Collectors.toList());
-        }
+        List<Speech> speeches = speechRepository.findAllSpeechesWithAnalysis(userId, lastSpeechId, pageable);
 
         boolean hasNext = speeches.size() > limit;
-        if (hasNext) speeches = speeches.subList(0, limit);
+        CursorDto cursorDto = null;
+
+        if (hasNext) {
+            Speech nextCursorSpeech = speeches.get(limit-1);
+            cursorDto = new CursorDto(nextCursorSpeech.getCreatedAt(), nextCursorSpeech.getId());
+            speeches.remove(limit);
+        }
+
 
         List<SpeechAnalysisResponseDto> dtoList = speeches.stream()
                 .map(speech -> {
@@ -303,13 +305,6 @@ public class SpeechService {
                 })
                 .collect(Collectors.toList());
 
-        // 마지막 스피치 id를 커서로 사용
-        CursorDto cursorDto = dtoList.isEmpty()
-                ? null
-                : new CursorDto(dtoList.get(dtoList.size() - 1).createdAt(),
-                dtoList.get(dtoList.size() - 1).speechId()
-        );
-
         return SpeechPagingResponseDto.builder()
                 .speeches(dtoList)
                 .hasNext(hasNext)
@@ -318,47 +313,26 @@ public class SpeechService {
     }
 
 
-private SpeechPagingResponseDto buildPagingResponse(List<SpeechAnalysisResponseDto> speeches, int limit) {
-    // S3 public URL로 변환
-    List<SpeechAnalysisResponseDto> content = speeches.stream()
-            .map(dto -> new SpeechAnalysisResponseDto(
-                    dto.speechId(),
-                    dto.createdAt(),
-                    s3UploadPresignedUrlService.getPublicS3Url(dto.fileUrl()), // URL 변환
-                    dto.content(),
-                    dto.summary(),
-                    dto.keywords(),
-                    dto.improvementPoints(),
-                    dto.feedback(),
-                    dto.expectedQuestions(),
-                    dto.isAnalyzed() // isAnalyzed 값 전달
-            ))
-            .collect(Collectors.toList());
-
-    boolean hasNext = content.size() > limit;
-    if (hasNext) {
-        content.remove(limit); // 마지막 항목 제거
-    }
-
-    CursorDto cursorDto = content.isEmpty() ?
-            null : new CursorDto(content.get(content.size() - 1).createdAt(), content.get(content.size() - 1).speechId());
-
-    return SpeechPagingResponseDto.builder()
-            .speeches(content)
-            .hasNext(hasNext)
-            .cursordto(cursorDto)
-            .build();
-}
-
 @Transactional(readOnly = true)
 public SpeechPagingFeedDto getMySpeecheFeed(Long userId, Long lastSpeechId, int limit, SortType sortType) {
     List<SpeechFeedDto> rawDtos = speechCustomRepository.findMyFeed(userId, lastSpeechId, limit + 1, sortType);
+
+    boolean hasNext = rawDtos.size() > limit;
+    CursorDto cursorDto = null;
+
+    // 다음 페이지가 존재할 경우에만 커서 정보를 설정하고, 마지막 초과분 데이터 제거
+    if (hasNext) {
+        SpeechFeedDto nextCursorData = rawDtos.get(limit-1);
+        cursorDto = new CursorDto(nextCursorData.createdAt(), nextCursorData.id());
+        rawDtos.remove(limit);
+    }
 
     List<SpeechFeedDto> processedDtos = rawDtos.stream()
             .map(dto -> new SpeechFeedDto(
                     dto.id(),
                     dto.title(),
                     dto.createdAt(),
+                    dto.duration(),
                     dto.fileType(),
                     s3UploadPresignedUrlService.getPublicS3Url(dto.fileUrl()),
                     dto.presentationContext(),
@@ -367,16 +341,6 @@ public SpeechPagingFeedDto getMySpeecheFeed(Long userId, Long lastSpeechId, int 
             ))
             .toList();
 
-    boolean hasNext = rawDtos.size() > limit;
-    if (hasNext) {
-        rawDtos.remove(limit);
-    }
-
-    CursorDto cursorDto = rawDtos.isEmpty() ? null : new CursorDto(rawDtos.get(rawDtos.size() - 1).createdAt(), rawDtos.get(rawDtos.size() - 1).id());
-
-    // SpeechFeedDto의 createdAt 필드는 String이므로,
-    // 정렬 기준이 createdAt인 경우 CursorDto의 필드도 이에 맞춰 수정.
-    // 여기서는 ID만을 커서로 사용하는 간단한 방식 가정
 
     return SpeechPagingFeedDto.builder()
             .speeches(processedDtos)

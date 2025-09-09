@@ -8,6 +8,7 @@ public record SpeechFeedDto(
         Long id,
         String title,            // 발표 파일 이름
         LocalDateTime createdAt,        // 등록 날짜 (문자열 변환)
+        Long duration,
         String fileType,         // AUDIO / VIDEO
         String fileUrl,
         String presentationContext,

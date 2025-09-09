@@ -46,9 +46,11 @@ public class SpeechController {
     @Operation(summary = "3. 텍스트 분석 open api", description = "stt로 변환된 content가 있어야 동작합니다.")
     @PostMapping("/analyze/{speechId}")
     public ResponseEntity<ApiResponse<SpeechResultDto>> analyzeSpeech(
+    public ResponseEntity<ApiResponse<AnalysisResultDto>> analyzeSpeech(
             @PathVariable Long speechId
     ) {
         SpeechResultDto dto = speechService.analyze(speechId);
+        AnalysisResultDto dto = speechService.analyze(speechId);
         return ResponseEntity.ok(ApiResponse.ok(dto));
     }
 
@@ -155,5 +157,15 @@ public class SpeechController {
         return ResponseEntity.ok(ApiResponse.ok(dto));
     }
 
+    @DeleteMapping("/delete/{speechId}")
+    public ResponseEntity<String> deleteSpeechById(
+        @PathVariable Long speechId,
+        @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        Long userId = userDetails.getUserId();
+        speechService.deleteSpeechById(speechId, userId);
+
+        return ResponseEntity.ok("삭제 완료");
+    }
 
 }

@@ -402,4 +402,20 @@ public AnalysisResultDto getSpeechContentAnalysisById(Long speechId) {
     return AnalysisResultDto.from(speech.getAnalysisResult());
 
 }
+
+    public void deleteSpeechById(Long speechId, Long userId) {
+        Speech speech = speechRepository.findById(speechId).orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
+
+        if(speech.getUser().getId() != userId) {
+            throw UserNotMatchException.EXCEPTION;
+        }
+
+        String fileKey = speech.getFileUrl();
+        if (fileKey != null && !fileKey.isEmpty()) {
+            s3UploadPresignedUrlService.deleteObject(fileKey);
+            log.info("Deleting S3 object: {}", fileKey);
+        }
+
+        speechRepository.delete(speech);
+    }
 }

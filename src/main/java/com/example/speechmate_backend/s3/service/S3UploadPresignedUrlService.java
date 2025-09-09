@@ -90,5 +90,9 @@ public class S3UploadPresignedUrlService {
         return new Date(System.currentTimeMillis() + PRESIGNED_URL_EXPIRATION_MILLIS);
     }
 
+    public void deleteObject(String key) {
+        amazonS3.deleteObject(bucket, key);
+    }
+
 
 }

@@ -68,13 +68,14 @@ public class SpeechService {
 */
 
     @Transactional
-    public SpeechResultDto analyze(Long speechId) {
+    public AnalysisResultDto analyze(Long speechId) {
         Speech speech = speechRepository.findById(speechId)
                 .orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
 
         if (speech.getAnalysisResult() != null) {
+            AnalysisResult res = speech.getAnalysisResult();
             String fileUrl = s3UploadPresignedUrlService.getPublicS3Url(speech.getFileUrl());
-            return SpeechResultDto.from(speech, fileUrl);
+            return AnalysisResultDto.from(res);
             //throw SpeechContentAlreadyExistException.EXCEPTION; // 이미 분석된 경우 종료
         }
 
@@ -90,7 +91,7 @@ public class SpeechService {
             speechRepository.save(speech);
             String fileUrl = s3UploadPresignedUrlService.getPublicS3Url(speech.getFileUrl());
             //log.info("[AI 분석 성공] Speech ID {} 논리 점수: {}", speechId, result.getLogicalCoherenceScore());
-            return SpeechResultDto.from(speech, fileUrl);
+            return AnalysisResultDto.from(result);
         } catch (Exception e) {
             log.error("[AI 분석 실패] Speech ID {}: {}", speechId, e.getMessage(), e);
             // 원하면 AI 실패 시 따로 정의된 예외로 던질 수도 있음

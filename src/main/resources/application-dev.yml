@@ -60,3 +60,6 @@ management:
   endpoint:
     health:
       show-details: always
+
+ffmpeg:
+  path: /usr/bin/ffmpeg

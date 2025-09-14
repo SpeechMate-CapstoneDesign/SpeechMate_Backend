@@ -166,4 +166,11 @@ public class SpeechController {
         return ResponseEntity.ok("삭제 완료");
     }
 
+
+    @Operation(summary = "mp4 -> mp3 변환(프론트는 신경쓰지마세요)", description = "")
+    @PostMapping("/test/translate/{speechId}")
+    public ResponseEntity<ApiResponse<String>> testtransistion(
+            @PathVariable Long speechId) {
+        return ResponseEntity.ok(ApiResponse.ok(speechService.testtranscription(speechId)));
+    }
 }

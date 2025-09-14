@@ -20,7 +20,9 @@ public enum ErrorCode implements ErrorCodeIfs{
     SPEECH_FILE_KEY_DOES_NOT_EQUAL("fail", HttpStatus.SC_BAD_REQUEST, "파일 키가 저장된 것과 일치하지 않음"),
     SPEECH_FILE_KEY_NOT_FOUND("fail", HttpStatus.SC_NOT_FOUND, "파일키가 없음"),
     WHISPER_EXCEPTION("fail", HttpStatus.SC_INTERNAL_SERVER_ERROR, "stt를 받아오는 whisper과정에서 오류 발생"),
-    USER_NOT_MATCH("fail", HttpStatus.SC_FORBIDDEN, "현재 로그인 한 유저가 일치하지 않습니다.");
+    USER_NOT_MATCH("fail", HttpStatus.SC_FORBIDDEN, "현재 로그인 한 유저가 일치하지 않습니다."),
+    FILE_TOO_LARGE("fail", HttpStatus.SC_BAD_REQUEST, "파일 크기가 25MB가 넘어갑니다. 작은 파일을 업로드해주세요"),
+    FFMPEG_EXCEPTION("fail", HttpStatus.SC_INTERNAL_SERVER_ERROR, "파일 변환 중 오류 발생(ffmpeg)");
 
 
     private final String status;

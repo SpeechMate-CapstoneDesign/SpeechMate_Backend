@@ -22,10 +22,10 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-#      - name: Create application.yml from secrets
-#        run: |
-#          mkdir -p ./src/main/resources
-#          echo "${{ secrets.APPLICATION_YML }}" > ./src/main/resources/application.yml
+      #      - name: Create application.yml from secrets
+      #        run: |
+      #          mkdir -p ./src/main/resources
+      #          echo "${{ secrets.APPLICATION_YML }}" > ./src/main/resources/application.yml
 
       - name: Grant execute permission for gradlew
         run: chmod +x ./gradlew
@@ -61,13 +61,60 @@ jobs:
             
             echo "Creating .env file from GitHub Secrets..."
             echo "${{ secrets.ENV_VARS }}" > ./.env
-            
-            
-            echo "🧹 기존 컨테이너 중지 및 삭제 중..."
-            docker compose down -v 
-            
-            echo "🧹 사용하지 않는 모든 이미지 삭제중..."
-            docker image prune -a -f 
+  
+  
+  
+            CURRENT=$(docker ps --format '{{.Names}}' | grep server-blue || true)
+  
+            if [ -z "$CURRENT" ]; then
+            echo "현재 server-blue가 죽어있음 → blue 컨테이너 기동"
+            docker compose up -d server-blue
+            NEW_CONTAINER="blue"
+            OLD_CONTAINER="green"
+            sed -i 's/server capstone-server-green:8080;/server capstone-server-blue:8080;/' ./nginx/conf.d/default.conf
+            HEALTH_URL="http://localhost:8080/actuator/health"
+            else
+            echo "현재 server-blue가 살아있음 → green 컨테이너 기동"
+            docker compose up -d server-green
+            NEW_CONTAINER="green"
+            OLD_CONTAINER="blue"
+            sed -i 's/server capstone-server-blue:8080;/server capstone-server-green:8080;/' ./nginx/conf.d/default.conf
+            HEALTH_URL="http://localhost:8081/actuator/health"
+            fi
 
-            docker compose pull
-            docker compose up -d
+#             헬스체크 대기 (최대 60초)
+            echo "새 컨테이너 준비 대기..."
+            READY=false
+            for i in {1..12}; do
+            if curl -s $HEALTH_URL | grep '"status":"UP"' > /dev/null; then
+            READY=true
+            echo "서버 준비 완료 ✅"
+            break
+            fi
+            echo "서버 준비중... ($i)"
+            sleep 5
+            done
+            
+            if [ "$READY" != true ]; then
+            echo "❌ 새 컨테이너 헬스체크 실패 → 롤백 시작"
+            
+            # nginx 설정 원복
+            if [ "$NEW_CONTAINER" == "blue" ]; then
+            sed -i 's/server capstone-server-blue:8080;/server capstone-server-green:8080;/' ./nginx/conf.d/default.conf
+            else
+            sed -i 's/server capstone-server-green:8080;/server capstone-server-blue:8080;/' ./nginx/conf.d/default.conf
+            fi
+            docker exec nginx-capstone nginx -s reload
+          
+            # 새 컨테이너 종료 및 제거
+            docker compose rm -sf server-$NEW_CONTAINER
+          
+            echo "롤백 완료 → $OLD_CONTAINER 컨테이너로 서비스 유지"
+            exit 1
+            fi
+            
+            echo "✅ 새 컨테이너 정상 기동, Nginx reload"
+            docker exec nginx-capstone nginx -s reload
+            
+            echo "구 컨테이너 종료 및 제거"
+            docker compose rm -sf server-$OLD_CONTAINER

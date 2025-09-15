@@ -1,16 +1,11 @@
 version: '3.8'
 
 services:
-  server:
+  server-blue:
     image: s13121312/capstoneback:latest
+    container_name: capstone-server-blue
     ports:
       - "8080:8080"
-    depends_on:
-      my-db:
-        condition: service_healthy
-      my-cache-server:
-        condition: service_healthy
-    restart: always
     env_file:
       - .env
     environment:
@@ -18,6 +13,32 @@ services:
       - TZ=Asia/Seoul
     networks:
       - capstone-net
+    restart: always
+    depends_on:
+      my-db:
+        condition: service_healthy
+      my-cache-server:
+        condition: service_healthy
+
+  server-green:
+    image: s13121312/capstoneback:latest
+    container_name: capstone-server-green
+    ports:
+      - "8081:8080"
+    env_file:
+      - .env
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+      - TZ=Asia/Seoul
+    networks:
+      - capstone-net
+    restart: always
+    depends_on:
+      my-db:
+        condition: service_healthy
+      my-cache-server:
+        condition: service_healthy
+
 
   nginx:
     image: nginx:latest

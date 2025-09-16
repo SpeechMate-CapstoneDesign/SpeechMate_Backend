@@ -1,7 +1,6 @@
 package com.example.speechmate_backend.speech.repository;
 
 import com.example.speechmate_backend.speech.controller.SortType;
-import com.example.speechmate_backend.speech.controller.dto.SpeechAnalysisResponseDto;
 import com.example.speechmate_backend.speech.controller.dto.SpeechFeedDto;
 import org.springframework.stereotype.Repository;
 

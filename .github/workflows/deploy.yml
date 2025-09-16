@@ -69,16 +69,16 @@ jobs:
               docker compose up -d server-blue
               NEW_CONTAINER="blue"
               OLD_CONTAINER="green"
-              sed -i '/server capstone-server-blue:8080;/s/^#\s*//g' ./nginx/default.conf
-              sed -i '/server capstone-server-green:8080;/s/^/#/g' ./nginx/default.conf
+              sed -i '/server capstone-server-blue:8080;/s/^#\s*//g' ./nginx/conf.d/default.conf
+              sed -i '/server capstone-server-green:8080;/s/^/#/g' ./nginx/conf.d/default.conf
               HEALTH_URL="http://localhost:8080/actuator/health"
             else
               echo "현재 server-blue가 살아있음 → green 컨테이너 기동"
               docker compose up -d server-green
               NEW_CONTAINER="green"
               OLD_CONTAINER="blue"
-              sed -i '/server capstone-server-green:8080;/s/^#\s*//g' ./nginx/default.conf
-              sed -i '/server capstone-server-blue:8080;/s/^/#/g' ./nginx/default.conf
+              sed -i '/server capstone-server-green:8080;/s/^#\s*//g' ./nginx/conf.d/default.conf
+              sed -i '/server capstone-server-blue:8080;/s/^/#/g' ./nginx/conf.d/default.conf
               HEALTH_URL="http://localhost:8081/actuator/health"
             fi
 
@@ -98,11 +98,11 @@ jobs:
               echo "❌ 새 컨테이너 헬스체크 실패 → 롤백 시작"
 
               if [ "$NEW_CONTAINER" == "blue" ]; then
-                sed -i '/server capstone-server-blue:8080;/s/^/#/g' ./nginx/default.conf
-                sed -i '/server capstone-server-green:8080;/s/^#\s*//g' ./nginx/default.conf
+                sed -i '/server capstone-server-blue:8080;/s/^/#/g' ./nginx/conf.d/default.conf
+                sed -i '/server capstone-server-green:8080;/s/^#\s*//g' ./nginx/conf.d/default.conf
               else
-                sed -i '/server capstone-server-green:8080;/s/^/#/g' ./nginx/default.conf
-                sed -i '/server capstone-server-blue:8080;/s/^#\s*//g' ./nginx/default.conf
+                sed -i '/server capstone-server-green:8080;/s/^/#/g' ./nginx/conf.d/default.conf
+                sed -i '/server capstone-server-blue:8080;/s/^#\s*//g' ./nginx/conf.d/default.conf
               fi
 
               docker exec nginx-capstone nginx -s reload

@@ -57,6 +57,7 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_PRIVATE_KEY }}
           script: |
+            set -e
             cd /home/ubuntu/capstone
 
             echo "Creating .env file from GitHub Secrets..."

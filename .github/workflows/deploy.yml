@@ -92,7 +92,7 @@ jobs:
                 break
               fi
               echo "서버 준비중... ($i)"
-              sleep 5
+              sleep 3
             done
 
             if [ "$READY" != true ]; then

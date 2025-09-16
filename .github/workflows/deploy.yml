@@ -69,7 +69,6 @@ jobs:
               docker compose up -d server-blue
               NEW_CONTAINER="blue"
               OLD_CONTAINER="green"
-#              blue 라인의 주석을 제거하고, green 라인에 주석을 추가
               sed -i '/server capstone-server-blue:8080;/s/^#\s*//g' ./nginx/default.conf
               sed -i '/server capstone-server-green:8080;/s/^/#/g' ./nginx/default.conf
               HEALTH_URL="http://localhost:8080/actuator/health"
@@ -78,7 +77,6 @@ jobs:
               docker compose up -d server-green
               NEW_CONTAINER="green"
               OLD_CONTAINER="blue"
-#              green 라인의 주석을 제거하고, blue 라인에 주석을 추가
               sed -i '/server capstone-server-green:8080;/s/^#\s*//g' ./nginx/default.conf
               sed -i '/server capstone-server-blue:8080;/s/^/#/g' ./nginx/default.conf
               HEALTH_URL="http://localhost:8081/actuator/health"
@@ -103,7 +101,6 @@ jobs:
                 sed -i '/server capstone-server-blue:8080;/s/^/#/g' ./nginx/default.conf
                 sed -i '/server capstone-server-green:8080;/s/^#\s*//g' ./nginx/default.conf
               else
-            # 롤백: green에 주석 추가, blue 주석 제거
                 sed -i '/server capstone-server-green:8080;/s/^/#/g' ./nginx/default.conf
                 sed -i '/server capstone-server-blue:8080;/s/^#\s*//g' ./nginx/default.conf
               fi

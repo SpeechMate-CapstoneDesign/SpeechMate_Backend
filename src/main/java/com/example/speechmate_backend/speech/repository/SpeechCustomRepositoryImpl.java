@@ -1,14 +1,12 @@
 package com.example.speechmate_backend.speech.repository;
 
 import com.example.speechmate_backend.speech.controller.SortType;
-import com.example.speechmate_backend.speech.controller.dto.SpeechAnalysisResponseDto;
 import com.example.speechmate_backend.speech.controller.dto.SpeechFeedDto;
 import com.example.speechmate_backend.speech.domain.QAnalysisResult;
 import com.example.speechmate_backend.speech.domain.QSpeech;
 import com.example.speechmate_backend.speech.domain.Speech;
 import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.BooleanExpression;
-import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;

@@ -431,6 +431,8 @@ public AnalysisResultDto getSpeechContentAnalysisById(Long speechId) {
 
 }
 
+
+    @CacheEvict(value = "speechFeedCache", allEntries = true)
     public void deleteSpeechById(Long speechId, Long userId) {
         Speech speech = speechRepository.findById(speechId).orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
 

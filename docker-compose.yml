@@ -11,6 +11,8 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=dev
       - TZ=Asia/Seoul
+    volumes:
+      - /usr/bin/ffmpeg:/usr/bin/ffmpeg
     networks:
       - capstone-net
     restart: always
@@ -30,6 +32,8 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=dev
       - TZ=Asia/Seoul
+    volumes:
+      - /usr/bin/ffmpeg:/usr/bin/ffmpeg
     networks:
       - capstone-net
     restart: always

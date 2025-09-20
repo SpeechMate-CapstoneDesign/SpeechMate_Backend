@@ -59,6 +59,9 @@ jobs:
           script: |
             set -e
             cd /home/ubuntu/capstone
+            
+            echo "🔄 최신 이미지 pull..."
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/capstoneback:latest
 
             echo "Creating .env file from GitHub Secrets..."
             echo "${{ secrets.ENV_VARS }}" > ./.env
@@ -85,7 +88,7 @@ jobs:
 
             echo "새 컨테이너 준비 대기..."
             READY=false
-            for i in {1..12}; do
+            for i in {1..30}; do
               if curl -s $HEALTH_URL | grep '"status":"UP"' > /dev/null; then
                 READY=true
                 echo "서버 준비 완료 ✅"

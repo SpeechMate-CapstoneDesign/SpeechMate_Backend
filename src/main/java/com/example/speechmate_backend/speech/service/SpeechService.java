@@ -1,6 +1,7 @@
 package com.example.speechmate_backend.speech.service;
 
 import com.example.speechmate_backend.common.ApiResponse;
+import com.example.speechmate_backend.common.aop.DistributedLock;
 import com.example.speechmate_backend.common.exception.*;
 import com.example.speechmate_backend.s3.MediaFileExtension;
 import com.example.speechmate_backend.s3.controller.dto.VoiceKeyDto;
@@ -178,7 +179,33 @@ public class SpeechService {
         }
     }
 
+    @DistributedLock(key = "'SPEECH_TRANSCRIBE:' + #speechId")
     public SpeechContentResponse transcribeversionFromS3(Long speechId) {
+        try {
+            Speech speech = speechRepository.findById(speechId)
+                    .orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
+            if (speech.getContent() != null && !speech.getContent().isEmpty()) {
+                return SpeechContentResponse.of(speech.getContent());
+            }
+
+            String fileKeyFromDb = speech.getFileUrl();
+            if (fileKeyFromDb == null || fileKeyFromDb.isEmpty()) {
+                // fileKey가 DB에 없는 경우에 대한 예외 처리
+                throw SpeechFileKeyNotFoundException.EXCEPTION;
+            }
+
+            String content = speechRestClient.transcribeWithFileFromS3(fileKeyFromDb);
+            speech.setContent(content);
+            speechRepository.save(speech);
+
+            return SpeechContentResponse.of(content);
+        } catch (Exception e) {
+            throw new RuntimeException("Whisper 변환 실패: " + e.getMessage(), e);
+        }
+
+    }
+
+    public SpeechContentResponse transcribeversionFromS3WithoutLock(Long speechId) {
         try {
             Speech speech = speechRepository.findById(speechId)
                     .orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
@@ -431,6 +458,8 @@ public AnalysisResultDto getSpeechContentAnalysisById(Long speechId) {
 
 }
 
+
+    @CacheEvict(value = "speechFeedCache", allEntries = true)
     public void deleteSpeechById(Long speechId, Long userId) {
         Speech speech = speechRepository.findById(speechId).orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
 

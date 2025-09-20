@@ -1,4 +1,6 @@
-FROM openjdk:17-jdk
+FROM openjdk:17-jdk-slim
+
+RUN apt-get update && apt-get install -y ffmpeg
 
 COPY build/libs/*SNAPSHOT.jar /app.jar
 

@@ -1,0 +1,28 @@
+spring:
+  # H2 데이터베이스 설정
+  datasource:
+    # jdbc:h2:mem:testdb -> 'testdb'라는 이름의 인메모리 DB를 사용하겠다는 의미
+    url: jdbc:h2:mem:testdb
+    driver-class-name: org.h2.Driver
+    username: sa # H2 기본 username
+    password:   # H2 기본 password는 비어있음
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  ai:
+    openai:
+      api-key: dummy-api-key
+  jpa:
+    hibernate:
+      # [중요] 테스트가 시작될 때 스키마(테이블)를 생성하고, 끝나면 삭제하는 설정
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        # H2 DB에 맞는 SQL 문법을 사용하도록 설정
+        dialect: org.hibernate.dialect.H2Dialect
+    # 실행되는 SQL 쿼리를 로그로 보고 싶을 때 활성화
+    show-sql: true
+  jwt:
+    secret: test-secret-key  # JwtUtil 실패 방지
+    expiration: 3600000

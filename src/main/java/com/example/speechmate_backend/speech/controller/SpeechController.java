@@ -5,6 +5,7 @@ import com.example.speechmate_backend.config.security.CustomUserDetails;
 import com.example.speechmate_backend.s3.MediaFileExtension;
 import com.example.speechmate_backend.s3.controller.dto.VoiceKeyDto;
 import com.example.speechmate_backend.speech.controller.dto.*;
+import com.example.speechmate_backend.speech.returnzero.ReturnZeroTokenManager;
 import com.example.speechmate_backend.speech.service.SpeechService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -22,8 +23,7 @@ import org.springframework.web.bind.annotation.*;
 public class SpeechController {
 
     private final SpeechService speechService;
-    private final SpeechRestClient speechRestClient;
-
+    private final ReturnZeroTokenManager tokenManager;
 
     @Operation(summary = "1. s3용 presigned url 발급", description ="요청 후에 나온 url에다가 put 메소드로 파일 업로드하면 됩니다")
     @PostMapping("/presignedWithS3")
@@ -172,5 +172,13 @@ public class SpeechController {
     public ResponseEntity<ApiResponse<String>> testtransistion(
             @PathVariable Long speechId) {
         return ResponseEntity.ok(ApiResponse.ok(speechService.testtranscription(speechId)));
+    }
+
+
+    @Operation(summary = "returnzero 토큰 발급(프론트는 신경쓰지마세요)")
+    @PostMapping("/test/returnzero/token")
+    public ResponseEntity<String> testtransistion(
+            ) {
+        return ResponseEntity.ok(tokenManager.getAccessToken());
     }
 }

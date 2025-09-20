@@ -12,6 +12,9 @@ import org.springframework.stereotype.Service;
 
 import java.util.Map;
 
+/*
+* 대본 분석, 언어적 분석
+* */
 @RequiredArgsConstructor
 @Service
 public class SpeechAnalysisResultService {

@@ -110,6 +110,10 @@ dependencies {
 
     implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.15.2'
 
+    implementation 'org.redisson:redisson-spring-boot-starter:3.51.0'
+    //h2
+    runtimeOnly 'com.h2database:h2'
+
 }
 
 dependencyManagement {

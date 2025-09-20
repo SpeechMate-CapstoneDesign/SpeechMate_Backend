@@ -59,6 +59,9 @@ jobs:
           script: |
             set -e
             cd /home/ubuntu/capstone
+            
+            echo "🔄 최신 이미지 pull..."
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/capstoneback:latest
 
             echo "Creating .env file from GitHub Secrets..."
             echo "${{ secrets.ENV_VARS }}" > ./.env

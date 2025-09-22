@@ -13,6 +13,7 @@ import com.example.speechmate_backend.speech.domain.AnalysisResult;
 import com.example.speechmate_backend.speech.domain.Speech;
 import com.example.speechmate_backend.speech.repository.SpeechCustomRepository;
 import com.example.speechmate_backend.speech.repository.SpeechRepository;
+import com.example.speechmate_backend.speech.returnzero.ReturnZeroClient;
 import com.example.speechmate_backend.user.domain.User;
 import com.example.speechmate_backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -45,34 +46,10 @@ public class SpeechService {
     private final SpeechAnalysisResultService speechAnalysisResultService;
     private final SpeechRestClient speechRestClient;
     private final SpeechCustomRepository speechCustomRepository;
-    private final CacheManager cacheManager;
-    private final RedisTemplate redisTemplate;
+    private final ReturnZeroClient returnZeroClient;
 
     @Value("${spring.ai.openai.api-key}")
     private String openAiApiKey;
-/*
-
-    @Transactional
-    public void transcribeWithGoogle(Long speechId) {
-        Speech speech = speechRepository.findById(speechId)
-                .orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
-
-        if (speech.getContent() != null && !speech.getContent().isEmpty()) {
-            return; // 이미 STT된 경우 종료
-        }
-
-        try {
-            String transcript = googleSttService.transcribe(speech.getFileUrl());
-            speech.setContent(transcript);
-            speechRepository.save(speech);
-            log.info("[STT 성공] Speech ID {} 원고 추출 완료", speechId);
-        } catch (Exception e) {
-            log.error("[STT 실패] Speech ID {} 원고 추출 실패: {}", speechId, e.getMessage(), e);
-            // 원하면 STT 실패 시 따로 정의된 예외로 던질 수도 있음
-            throw new IllegalStateException("STT 작업 실패: " + e.getMessage(), e);
-        }
-    }
-*/
 
     @Transactional
     public AnalysisResultDto analyze(Long speechId) {
@@ -93,7 +70,7 @@ public class SpeechService {
         try {
             log.info("Speech ID {}에 대한 텍스트 분석을 시작합니다.", speechId);
 
-            AnalysisResult result = speechAnalysisResultService.analyzeText(speech.getContent());
+            AnalysisResult result = speechAnalysisResultService.analyzeText(speech, speech.getContent());
             speech.setAnalysisResult(result);
             speechRepository.save(speech);
             String fileUrl = s3UploadPresignedUrlService.getPublicS3Url(speech.getFileUrl());
@@ -106,42 +83,45 @@ public class SpeechService {
         }
     }
 
+    public SpeechContentResponse rtzrStt(Long speechId) {
+        try {
+            Speech speech = speechRepository.findById(speechId)
+                    .orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
+            if (speech.getContent() != null && !speech.getContent().isEmpty()) {
+                return SpeechContentResponse.of(speech.getContent());
+            }
 
-    /*public String transcribeWithMultipartFile(MultipartFile file, Long speechId) {
-        Speech speech = speechRepository.findById(speechId)
-                .orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
-        log.info("🔍 MultipartFile 디버깅 시작");
-        log.info("파일 이름: {}", file.getOriginalFilename());
-        log.info("파일 크기: {} bytes", file.getSize());
-        log.info("Content-Type: {}", file.getContentType());
-        log.info("isEmpty: {}", file.isEmpty());
-        log.info("파일 확장자: {}",
-                file.getOriginalFilename() != null && file.getOriginalFilename().contains(".")
-                        ? file.getOriginalFilename().substring(file.getOriginalFilename().lastIndexOf("."))
-                        : "없음"
-        );
-        if (speech.getAnalysisResult() != null) {
-            throw new IllegalStateException("이미 분석 결과가 있음 "); // 이미 분석된 경우 종료
+            String fileKeyFromDb = speech.getFileUrl();
+            if (fileKeyFromDb == null || fileKeyFromDb.isEmpty()) {
+                // fileKey가 DB에 없는 경우에 대한 예외 처리
+                throw SpeechFileKeyNotFoundException.EXCEPTION;
+            }
+
+            String rtzrId = returnZeroClient.rtzrSttFromS3(fileKeyFromDb);
+            TranscriptionResponse transcriptionResponse = returnZeroClient.rtzrTranscription(rtzrId);
+            String content = speechAnalysisResultService.verbalanalyze(speech, transcriptionResponse);
+
+            speechRepository.save(speech);
+
+            return SpeechContentResponse.of(content);
+        } catch (Exception e) {
+            throw ReturnZeroException.EXCEPTION;
         }
 
+    }
 
+    //테스트용
+    public void testrtzrStt(String rtzrId) {
         try {
 
-            String result = whisperClient.transcribe(
-                    file,
-                    "whisper-1",
-                    "ko",
-                    "text",
-                    "Bearer " + openAiApiKey
-            );
-            log.info("Whisper STT 결과: {}", result);
-            speech.setContent(result);
-            return result;
+            String transcriptionResponse = returnZeroClient.testrtzrTranscription(rtzrId);
+            //speechAnalysisResultService.verbalanalyze(transcriptionResponse);
+            System.out.println(transcriptionResponse);
         } catch (Exception e) {
-            log.error("Whisper 호출 실패", e);
-            throw new IllegalStateException("Whisper 호출 실패: " + e.getMessage(), e);
+            throw ReturnZeroException.EXCEPTION;
         }
-    }*/
+
+    }
 
     public ResponseEntity<ApiResponse<String>> callWhisperStt(MultipartFile file, Long speechId) {
         Speech speech = speechRepository.findById(speechId)
@@ -475,4 +455,6 @@ public AnalysisResultDto getSpeechContentAnalysisById(Long speechId) {
 
         speechRepository.delete(speech);
     }
+
+
 }

@@ -52,7 +52,6 @@ public class SpeechController {
         return ResponseEntity.ok(ApiResponse.ok(dto));
     }
 
-
 //    @Operation(summary = "2-1. whisper api Multipart용", description = "multipart 파일로부터 stt로변환된 내용을 뽑아냅니다.(1을 먼저 선행하여 s3에 파일 저장후 요청해주세요")
 //    @PostMapping(value = "/Whisperstt2/{speechId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 //    public ResponseEntity<ApiResponse<String>> transcribe2(
@@ -61,6 +60,14 @@ public class SpeechController {
 //            @PathVariable Long speechId) {
 //        return speechService.transcribeversion2(file, speechId);
 //    }
+
+    @Operation(summary = "2-2. rtzr api (stt)", description = "저장된 s3 파일로부터 stt로변환된 내용을 뽑아냅니다.(1을 먼저 선행하여 s3에 파일 저장후 요청해주세요")
+    @PostMapping(value = "/rtzrstt/{speechId}")
+    public ResponseEntity<ApiResponse<SpeechContentResponse>> transcribesRtzr(
+            @Parameter(description = "stt변환을 진행할 speechId", required = true)
+            @PathVariable Long speechId) {
+        return ResponseEntity.ok(ApiResponse.ok(speechService.rtzrStt(speechId)));
+    }
 
     @Operation(summary = "2-1. whisper api s3에서 받아온것", description = "저장된 s3 파일로부터 stt로변환된 내용을 뽑아냅니다.(1을 먼저 선행하여 s3에 파일 저장후 요청해주세요")
     @PostMapping(value = "/Whisperstt3/{speechId}")
@@ -180,5 +187,14 @@ public class SpeechController {
     public ResponseEntity<String> testtransistion(
             ) {
         return ResponseEntity.ok(tokenManager.getAccessToken());
+    }
+
+    //테스트용
+    @Operation(summary = "returnzero stt결과 분석(프론트는 신경쓰지마세요)", description = "간투어, ")
+    @PostMapping("/test/returnzero/verbal/{rtzrId}")
+    public void testverbalanalysis(
+            @PathVariable String rtzrId
+    ) {
+        speechService.testrtzrStt(rtzrId);
     }
 }

@@ -11,6 +11,7 @@ import com.example.speechmate_backend.speech.controller.SpeechRestClient;
 import com.example.speechmate_backend.speech.controller.dto.*;
 import com.example.speechmate_backend.speech.domain.AnalysisResult;
 import com.example.speechmate_backend.speech.domain.Speech;
+import com.example.speechmate_backend.speech.domain.VerbalAnalysisResult;
 import com.example.speechmate_backend.speech.repository.SpeechCustomRepository;
 import com.example.speechmate_backend.speech.repository.SpeechRepository;
 import com.example.speechmate_backend.speech.returnzero.ReturnZeroClient;
@@ -348,7 +349,7 @@ public class SpeechService {
 
 
 @Transactional(readOnly = true)
-@Cacheable(value = "speechFeedCache", key = "#userId + '_' + #lastSpeechId + '_' + #limit + '_' + #sortType")
+//@Cacheable(value = "speechFeedCache", key = "#userId + '_' + #lastSpeechId + '_' + #limit + '_' + #sortType")
 public SpeechPagingFeedDto getMySpeecheFeed(Long userId, Long lastSpeechId, int limit, SortType sortType) {
     List<SpeechFeedDto> rawDtos = speechCustomRepository.findMyFeed(userId, lastSpeechId, limit + 1, sortType);
 
@@ -457,4 +458,11 @@ public AnalysisResultDto getSpeechContentAnalysisById(Long speechId) {
     }
 
 
+    public VerbalAnalysisDto getSpeechVerbalAnalysisById(Long speechId) {
+
+        Speech speech = speechRepository.findById(speechId).orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
+        VerbalAnalysisResult verbalAnalysisResult = speech.getVerbalAnalysisResult();
+
+        return VerbalAnalysisDto.from(verbalAnalysisResult);
+    }
 }

@@ -1,8 +1,10 @@
 package com.example.speechmate_backend.speech.domain;
 
 import jakarta.persistence.*;
+import lombok.Getter;
 import lombok.Setter;
 
+@Getter
 @Setter
 @Entity
 @Table(name = "verbal_analysis_result")

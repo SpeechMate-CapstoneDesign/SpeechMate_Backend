@@ -51,7 +51,7 @@ public class SpeechAnalysisResultService {
             - improvementPoints: 개선점 3가지를 구체적으로 서술하세요. 이 항목은 JSON 배열(List<String>)로 응답해야 합니다.
             - feedback: 발표 전체에 대한 종합적인 피드백을 작성하세요. 발표자의 강점과 약점을 균형 있게 다루세요.
             - expectedQuestions: 청중이 발표를 들은 후 할 수 있는 질문을 3가지 예측해서 작성하세요. 이 항목은 JSON 배열(List<String>)로 응답해야 합니다.
-            - repeatedWords: 텍스트에서 2회 이상 반복된 단어를 '단어' : '횟수' 형식의 JSON 객체로 제공해주세요.
+            - repeatedWords: 텍스트에서 2회 이상 반복된 단어를 '단어' : '횟수' 형식의 JSON 객체로 제공해주세요.(간투어는 제외해주세요)
             - 결과는 반드시 아래에 명시된 JSON 형식으로만 응답해야 합니다. 다른 설명은 절대 추가하지 마세요.
             
             {format}
@@ -111,7 +111,7 @@ public class SpeechAnalysisResultService {
         long syllableCnt = 0;//음절 수(글자 수)
         List<Silence> silenceList = new LinkedList<>();
 
-        Set<String> fillers = Set.of("아", "어", "음", "그", "저기", "막");
+        Set<String> fillers = Set.of("아", "어", "음", "그", "저", "막", "뭐");
         Map<String, List<Integer>> fillerUsage = new HashMap<>();
 
         for(TranscriptionResponse.Utterance ut : transcriptionResponse.results().utterances()) {

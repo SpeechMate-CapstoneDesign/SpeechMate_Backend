@@ -61,7 +61,7 @@ public class SpeechController {
 //        return speechService.transcribeversion2(file, speechId);
 //    }
 
-    @Operation(summary = "2-2. rtzr api (stt)", description = "저장된 s3 파일로부터 stt로변환된 내용을 뽑아냅니다.(1을 먼저 선행하여 s3에 파일 저장후 요청해주세요")
+    @Operation(summary = "2. rtzr api (stt)", description = "저장된 s3 파일로부터 stt로변환된 내용을 뽑아냅니다.(1을 먼저 선행하여 s3에 파일 저장후 요청해주세요")
     @PostMapping(value = "/rtzrstt/{speechId}")
     public ResponseEntity<ApiResponse<SpeechContentResponse>> transcribesRtzr(
             @Parameter(description = "stt변환을 진행할 speechId", required = true)
@@ -69,13 +69,13 @@ public class SpeechController {
         return ResponseEntity.ok(ApiResponse.ok(speechService.rtzrStt(speechId)));
     }
 
-    @Operation(summary = "2-1. whisper api s3에서 받아온것", description = "저장된 s3 파일로부터 stt로변환된 내용을 뽑아냅니다.(1을 먼저 선행하여 s3에 파일 저장후 요청해주세요")
+    /*@Operation(summary = "2-1. whisper api s3에서 받아온것", description = "저장된 s3 파일로부터 stt로변환된 내용을 뽑아냅니다.(1을 먼저 선행하여 s3에 파일 저장후 요청해주세요")
     @PostMapping(value = "/Whisperstt3/{speechId}")
     public ResponseEntity<ApiResponse<SpeechContentResponse>> transcribes3(
             @Parameter(description = "stt변환을 진행할 speechId", required = true)
             @PathVariable Long speechId) {
         return ResponseEntity.ok(ApiResponse.ok(speechService.transcribeversionFromS3(speechId)));
-    }
+    }*/
 
 
     @Operation(summary = "1-1. 업로드 완료 콜백", description = "클라이언트가 presigned url로 업로드 완료한 후 콜백 합니다.")
@@ -130,6 +130,7 @@ public class SpeechController {
         return ResponseEntity.ok(ApiResponse.ok(speechService.getSpeechById(speechId)));
     }
 
+    @Operation(summary = "파일과 관련된 정보를 불러옵니다.")
     @GetMapping("/{speechId}/speechConfig")
     public ResponseEntity<ApiResponse<SpeechConfigDto>> getSpeechConfigById(
             @PathVariable Long speechId
@@ -137,6 +138,7 @@ public class SpeechController {
         return ResponseEntity.ok(ApiResponse.ok(speechService.getSpeechConfigById(speechId)));
     }
 
+    @Operation(summary = "파일의 대본을 불러옵니다.")
     @GetMapping("/{speechId}/content")
     public ResponseEntity<ApiResponse<SpeechContentResponse>> getSpeechContnetById(
             @PathVariable Long speechId
@@ -144,6 +146,7 @@ public class SpeechController {
         return ResponseEntity.ok(ApiResponse.ok(speechService.getSpeechContentById(speechId)));
     }
 
+    @Operation(summary = "파일 대본 분석 결과를 불러옵니다.")
     @GetMapping("/{speechId}/contentAnalysis")
     public ResponseEntity<ApiResponse<AnalysisResultDto>> getSpeechContentAnalysisById(
             @PathVariable Long speechId
@@ -151,6 +154,15 @@ public class SpeechController {
         return ResponseEntity.ok(ApiResponse.ok(speechService.getSpeechContentAnalysisById(speechId)));
     }
 
+    @Operation(summary = "언어적 분석 결과를 불러옵니다.")
+    @GetMapping("/{speechId}/verbalAnalysis")
+    public ResponseEntity<ApiResponse<VerbalAnalysisDto>> getSpeechVerbalAnalysisById(
+            @PathVariable Long speechId
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(speechService.getSpeechVerbalAnalysisById(speechId)));
+    }
+
+    @Operation(summary = "피드를 조회합니다.")
     @GetMapping("/myFeed")
     public ResponseEntity<ApiResponse<SpeechPagingFeedDto>> getSpeechContentAnalysisById(
             @RequestParam(required = false) Long lastSpeechId,
@@ -162,6 +174,7 @@ public class SpeechController {
         return ResponseEntity.ok(ApiResponse.ok(dto));
     }
 
+    @Operation(summary = "스피치를 삭제합니다.")
     @DeleteMapping("/delete/{speechId}")
     public ResponseEntity<String> deleteSpeechById(
         @PathVariable Long speechId,

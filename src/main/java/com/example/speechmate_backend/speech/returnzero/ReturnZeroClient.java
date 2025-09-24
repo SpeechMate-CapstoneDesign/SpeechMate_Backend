@@ -8,7 +8,6 @@ import com.example.speechmate_backend.s3.service.S3UploadPresignedUrlService;
 import com.example.speechmate_backend.speech.controller.dto.TranscriptionResponse;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;

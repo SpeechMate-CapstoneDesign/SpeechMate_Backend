@@ -51,6 +51,10 @@ public class Speech extends BaseEntity {
     @JoinColumn(name = "analysis_result_id")
     private AnalysisResult analysisResult;
 
+    @OneToOne(mappedBy = "speech", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private VerbalAnalysisResult verbalAnalysisResult;
+
+
 
     public void setFileUrl(String fileUrl) {
         this.FileUrl = fileUrl;
@@ -72,5 +76,12 @@ public class Speech extends BaseEntity {
         this.analysisResult = analysisResult;
         // analysisResult 쪽에도 speech를 설정하여 양방향 관계를 동기화
         analysisResult.setSpeech(this);
+    }
+
+    public void setVerbalAnalysisResult(VerbalAnalysisResult verbalAnalysisResult) {
+        this.verbalAnalysisResult = verbalAnalysisResult;
+        if (verbalAnalysisResult != null) {
+            verbalAnalysisResult.setSpeech(this); // 양방향 동기화
+        }
     }
 }

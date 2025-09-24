@@ -106,7 +106,6 @@ public class SpeechTest {
         ExecutorService executorService = Executors.newFixedThreadPool(threadCount);
         CountDownLatch latch = new CountDownLatch(threadCount);
 
-        // [핵심] 가짜 RestClient 설정:
         // 1. 호출되면 100ms 동안 지연시켜 실제 API처럼 동작하게 만듭니다.
         // 2. "Mock STT Result" 라는 가짜 결과를 반환합니다.
         when(speechRestClient.transcribeWithFileFromS3(anyString())).thenAnswer(invocation -> {
@@ -133,7 +132,7 @@ public class SpeechTest {
         executorService.shutdown();
 
         // then
-        // [핵심 검증] 10개의 스레드가 경쟁했지만, 비용이 발생하는 speechRestClient의 메소드는
+        // 10개의 스레드가 경쟁했지만, 비용이 발생하는 speechRestClient의 메소드는
         // 오직 1번만 호출되었는지 검증합니다.
         verify(speechRestClient, times(1)).transcribeWithFileFromS3(anyString());
 
@@ -150,7 +149,7 @@ public class SpeechTest {
         ExecutorService executorService = Executors.newFixedThreadPool(threadCount);
         CountDownLatch latch = new CountDownLatch(threadCount);
 
-        // [핵심] 가짜 RestClient 설정:
+        // 가짜 RestClient 설정:
         // 1. 호출되면 100ms 동안 지연시켜 실제 API처럼 동작하게 만듭니다.
         // 2. "Mock STT Result" 라는 가짜 결과를 반환합니다.
         when(speechRestClient.transcribeWithFileFromS3(anyString())).thenAnswer(invocation -> {
@@ -177,7 +176,7 @@ public class SpeechTest {
         executorService.shutdown();
 
         // then
-        // [핵심 검증] 10개의 스레드가 경쟁했지만, 비용이 발생하는 speechRestClient의 메소드는
+        // 10개의 스레드가 경쟁했지만, 비용이 발생하는 speechRestClient의 메소드는
         // 오직 1번만 호출되었는지 검증합니다.
         verify(speechRestClient, times(10)).transcribeWithFileFromS3(anyString());
 

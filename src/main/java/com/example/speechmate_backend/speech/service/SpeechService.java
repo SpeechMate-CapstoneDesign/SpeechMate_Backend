@@ -20,12 +20,9 @@ import com.example.speechmate_backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -84,6 +81,7 @@ public class SpeechService {
         }
     }
 
+    @DistributedLock(key = "'SPEECH_TRANSCRIBE:' + #speechId")
     public SpeechContentResponse rtzrStt(Long speechId) {
         try {
             Speech speech = speechRepository.findById(speechId)

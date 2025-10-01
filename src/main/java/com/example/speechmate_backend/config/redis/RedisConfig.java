@@ -32,11 +32,15 @@ public class RedisConfig {
     @Value("${spring.data.redis.port}")
     private int port;
 
+    @Value("${spring.data.redis.password}")
+    private String password;
+
     @Bean
     public RedisConnectionFactory redisConnectionFactory() {
         RedisStandaloneConfiguration config = new RedisStandaloneConfiguration();
         config.setHostName(host);  //  명시적으로 설정
         config.setPort(port);
+        config.setPassword(password);
         return new LettuceConnectionFactory(config);
     }
 

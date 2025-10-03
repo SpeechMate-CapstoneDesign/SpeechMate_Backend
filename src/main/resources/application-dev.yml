@@ -12,6 +12,7 @@ spring:
     redis:
       host: my-cache-server
       port: 6379
+      password: ${REDIS_PASSWORD}
   jwt:
     access:
       plus-hour: 1   # 1시간

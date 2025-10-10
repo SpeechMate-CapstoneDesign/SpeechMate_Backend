@@ -23,8 +23,8 @@ public enum ErrorCode implements ErrorCodeIfs{
     USER_NOT_MATCH("fail", HttpStatus.SC_FORBIDDEN, "현재 로그인 한 유저가 일치하지 않습니다."),
     FILE_TOO_LARGE("fail", HttpStatus.SC_BAD_REQUEST, "파일 크기가 25MB가 넘어갑니다. 작은 파일을 업로드해주세요"),
     FFMPEG_EXCEPTION("fail", HttpStatus.SC_INTERNAL_SERVER_ERROR, "파일 변환 중 오류 발생(ffmpeg)"),
-    RETURN_ZERO_EXCEPTION("fail", HttpStatus.SC_INTERNAL_SERVER_ERROR, "ReturnZero stt 과정중 오류 발생");
-
+    RETURN_ZERO_EXCEPTION("fail", HttpStatus.SC_INTERNAL_SERVER_ERROR, "ReturnZero stt 과정중 오류 발생"),
+    UPLOAD_LIMIT_EXCEED("fail", HttpStatus.SC_TOO_MANY_REQUESTS, "이미 5회 업로드 했습니다.");
 
     private final String status;
     private final Integer resultCode;

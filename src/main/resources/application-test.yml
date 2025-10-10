@@ -10,6 +10,7 @@ spring:
     redis:
       host: localhost
       port: 6379
+      password: redis1234
   ai:
     openai:
       api-key: dummy-api-key
@@ -26,3 +27,7 @@ spring:
   jwt:
     secret: test-secret-key  # JwtUtil 실패 방지
     expiration: 3600000
+
+returnzero:
+  client-id: dummy-client-id
+  client-secret: dummy-client-secret

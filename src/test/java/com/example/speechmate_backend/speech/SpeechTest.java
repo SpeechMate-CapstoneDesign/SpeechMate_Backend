@@ -1,11 +1,14 @@
 package com.example.speechmate_backend.speech;
 
+import com.example.speechmate_backend.common.exception.UploadLimitExceededException;
+import com.example.speechmate_backend.config.redis.RedisUtil;
 import com.example.speechmate_backend.s3.config.S3Config;
 import com.example.speechmate_backend.s3.service.S3UploadPresignedUrlService;
 import com.example.speechmate_backend.speech.controller.SpeechRestClient;
 import com.example.speechmate_backend.speech.domain.Speech;
 import com.example.speechmate_backend.speech.repository.SpeechCustomRepository;
 import com.example.speechmate_backend.speech.repository.SpeechRepository;
+import com.example.speechmate_backend.speech.returnzero.ReturnZeroClient;
 import com.example.speechmate_backend.speech.service.SpeechAnalysisResultService;
 import com.example.speechmate_backend.speech.service.SpeechService;
 import com.example.speechmate_backend.user.domain.OauthInfo;
@@ -30,6 +33,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
@@ -45,6 +49,9 @@ public class SpeechTest {
     // 기존 MockBean
     @MockBean
     private SpeechRestClient speechRestClient;
+
+    @Autowired
+    private RedisUtil redisUtil;
 
     // 추가 MockBean: SpeechService의 다른 의존성들
     @MockBean
@@ -68,6 +75,10 @@ public class SpeechTest {
 
     @MockBean
     private RedisTemplate<String, Object> redisTemplate;  // RedisTemplate 타입 확인 (Object는 예시)
+
+    @MockBean
+    private ReturnZeroClient returnZeroClient;
+
 
     private Speech speech;
 
@@ -184,4 +195,19 @@ public class SpeechTest {
         Speech resultSpeech = speechRepository.findById(speech.getId()).get();
         assertThat(resultSpeech.getContent()).isEqualTo("Mock STT Result");
     }
+
+    @Test
+    @DisplayName("같은 날 6번째 업로드 시도 시 UploadLimitExceededException 발생")
+    void uploadLimitExceeded_after_five_requests() {
+        String userId = "123";
+        // 5번은 통과
+        for (int i = 0; i < 5; i++) {
+            redisUtil.uploadlimit(userId);
+        }
+
+        // 6번째는 예외 발생
+        assertThrows(UploadLimitExceededException.class,
+                () -> redisUtil.uploadlimit(userId));
+    }
+
 }

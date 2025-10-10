@@ -1,10 +1,13 @@
 package com.example.speechmate_backend.config.redis;
 
+import com.example.speechmate_backend.common.exception.UploadLimitExceededException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.concurrent.TimeUnit;
 
 @RequiredArgsConstructor
@@ -39,5 +42,17 @@ public class RedisUtil {
 
     public void deleteRefreshToken(String userId) {
         redisTemplate.delete(REFRESH_TOKEN_PREFIX + userId);
+    }
+
+    public void uploadlimit(String userId) {
+        String key = "upload:" + userId + ":" + LocalDate.now();
+        Long count = redisTemplate.opsForValue().increment(key);
+        if(count == 1) {
+            long ttl = Duration.between(LocalDateTime.now(), LocalDate.now().plusDays(1).atStartOfDay()).getSeconds();
+            redisTemplate.expire(key, ttl, TimeUnit.SECONDS);
+        }
+        if(count > 5) {
+            throw UploadLimitExceededException.EXCEPTION;
+        }
     }
 }

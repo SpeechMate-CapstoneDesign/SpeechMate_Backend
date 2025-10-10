@@ -3,6 +3,7 @@ package com.example.speechmate_backend.speech.service;
 import com.example.speechmate_backend.common.ApiResponse;
 import com.example.speechmate_backend.common.aop.DistributedLock;
 import com.example.speechmate_backend.common.exception.*;
+import com.example.speechmate_backend.config.redis.RedisUtil;
 import com.example.speechmate_backend.s3.MediaFileExtension;
 import com.example.speechmate_backend.s3.controller.dto.VoiceKeyDto;
 import com.example.speechmate_backend.s3.service.S3UploadPresignedUrlService;
@@ -45,6 +46,7 @@ public class SpeechService {
     private final SpeechRestClient speechRestClient;
     private final SpeechCustomRepository speechCustomRepository;
     private final ReturnZeroClient returnZeroClient;
+    private final RedisUtil redisUtil;
 
     @Value("${spring.ai.openai.api-key}")
     private String openAiApiKey;
@@ -235,6 +237,7 @@ public class SpeechService {
                 .orElseThrow(() -> UserNotFoundException.EXCEPTION);
         log.info("userID: " + userId);
 
+        redisUtil.uploadlimit(String.valueOf(userId));
         // 2. Presigned URL 발급
         VoiceKeyDto dto = s3UploadPresignedUrlService.generatePreSignedUrlForSpeech(userId, fileExtension);
 

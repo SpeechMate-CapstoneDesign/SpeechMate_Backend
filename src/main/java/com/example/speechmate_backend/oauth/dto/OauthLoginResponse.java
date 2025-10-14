@@ -9,6 +9,7 @@ import lombok.Data;
 @Data
 public class OauthLoginResponse {
 
+    private Long userId;
     private boolean isNewUser;
     private String access;
     private String refresh;

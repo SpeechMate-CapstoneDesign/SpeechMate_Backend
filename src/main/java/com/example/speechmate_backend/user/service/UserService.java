@@ -55,6 +55,7 @@ public class UserService {
         redisUtil.storeRefreshToken(user.getId().toString(), refresh, 24*7);
 
         return OauthLoginResponse.builder()
+                .userId(user.getId())
                 .isNewUser(isNewUser)
                 .access(access)
                 .accessExpiredAt(accessExpiry)

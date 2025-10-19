@@ -25,16 +25,21 @@ public class VerbalAnalysisConverter {
                              List<Silence> silenceList,
                              Map<String, List<Integer>> fillerUsage) throws JsonProcessingException {
 
-        VerbalAnalysisResult result = new VerbalAnalysisResult();
-        result.setSpeech(speech);
-        result.setWordCnt(wordCnt);
-        result.setSyllableCnt(syllableCnt);
+        VerbalAnalysisResult result = speech.getVerbalAnalysisResult();
 
-        // JSON 직렬화
-        result.setSilenceJson(objectMapper.writeValueAsString(silenceList));
-        result.setFillerJson(objectMapper.writeValueAsString(fillerUsage));
+        // 2. 연결된 것이 없다면, 'speech_id'로 DB에서 '고아 레코드'가 있는지 조회
+        if (result == null) {
+            result = repository.findBySpeechId(speech.getId())
+                    .orElseGet(VerbalAnalysisResult::new); // DB에도 없으면 'new'로 새로 생성
+        }
 
-        repository.save(result);
+        // 3. 'result' 객체의 필드 값 업데이트 (DB 저장 X, 메모리에서만)
+        String silenceJson = objectMapper.writeValueAsString(silenceList);
+        String fillerJson = objectMapper.writeValueAsString(fillerUsage);
+
+        // (VerbalAnalysisResult에 만들어둔 update 메서드 호출)
+        result.updateAnalysis(wordCnt, syllableCnt, silenceJson, fillerJson);
+
         speech.setVerbalAnalysisResult(result);
     }
 

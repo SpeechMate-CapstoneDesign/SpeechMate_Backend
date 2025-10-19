@@ -63,7 +63,7 @@ public class SpeechController {
 
     @Operation(summary = "2. rtzr api (stt)", description = "저장된 s3 파일로부터 stt로변환된 내용을 뽑아냅니다.(1을 먼저 선행하여 s3에 파일 저장후 요청해주세요")
     @PostMapping(value = "/rtzrstt/{speechId}")
-    public ResponseEntity<ApiResponse<SpeechContentResponse>> transcribesRtzr(
+    public ResponseEntity<ApiResponse<SpeechSentenceResponse>> transcribesRtzr(
             @Parameter(description = "stt변환을 진행할 speechId", required = true)
             @PathVariable Long speechId) {
         return ResponseEntity.ok(ApiResponse.ok(speechService.rtzrStt(speechId)));

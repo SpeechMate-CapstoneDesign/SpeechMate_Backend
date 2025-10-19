@@ -20,6 +20,10 @@ public class Speech extends BaseEntity {
     @Column(columnDefinition = "TEXT")
     private String content;  //stt변환 결과
 
+    @Lob
+    @Column(columnDefinition = "TEXT")
+    private String rawTranscription; // vito.ai 원본 JSON 저장용
+
     private String title; // 발표 파일 이름
 
     private String presentationContext; // 발표 상황
@@ -62,6 +66,10 @@ public class Speech extends BaseEntity {
 
     public void setContent(String content) {
         this.content = content;
+    }
+
+    public void setRawTranscription(String rawTranscription) {
+        this.rawTranscription = rawTranscription;
     }
 
     public void setUser(User user) {

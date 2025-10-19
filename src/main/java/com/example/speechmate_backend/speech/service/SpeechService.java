@@ -18,6 +18,8 @@ import com.example.speechmate_backend.speech.repository.SpeechRepository;
 import com.example.speechmate_backend.speech.returnzero.ReturnZeroClient;
 import com.example.speechmate_backend.user.domain.User;
 import com.example.speechmate_backend.user.repository.UserRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -47,6 +49,7 @@ public class SpeechService {
     private final SpeechCustomRepository speechCustomRepository;
     private final ReturnZeroClient returnZeroClient;
     private final RedisUtil redisUtil;
+    private final ObjectMapper objectMapper;
 
     @Value("${spring.ai.openai.api-key}")
     private String openAiApiKey;
@@ -84,28 +87,101 @@ public class SpeechService {
     }
 
     @DistributedLock(key = "'SPEECH_TRANSCRIBE:' + #speechId")
-    public SpeechContentResponse rtzrStt(Long speechId) {
+    public SpeechSentenceResponse rtzrStt(Long speechId) {
         try {
             Speech speech = speechRepository.findById(speechId)
                     .orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
-            if (speech.getContent() != null && !speech.getContent().isEmpty()) {
-                return SpeechContentResponse.of(speech.getContent());
+
+            TranscriptionResponse transcriptionResponse;
+            String rawJson = speech.getRawTranscription();
+
+            // ✅ 1. 'isNewAnalysis' -> 'needsNewAnalysis'로 이름 변경 (더 명확하게)
+            boolean needsNewAnalysis = false;
+
+            if (rawJson != null && !rawJson.isEmpty()) {
+                // [캐시 있음]
+                log.info("DB에서 STT JSON 원본을 로드합니다. (Speech ID: {})", speechId);
+                transcriptionResponse = objectMapper.readValue(rawJson, TranscriptionResponse.class);
+
+                // 캐시는 있지만, 분석 결과가 없으면 새로 분석 필요
+                if (speech.getVerbalAnalysisResult() == null) {
+                    log.warn("Speech ID {}: STT 캐시는 있으나 분석 결과가 없어, 재분석합니다.", speech.getId());
+                    needsNewAnalysis = true;
+                }
+            } else {
+                // [캐시 없음]
+                log.info("vito.ai API를 호출하여 STT를 진행합니다. (Speech ID: {})", speechId);
+
+                String fileKeyFromDb = speech.getFileUrl();
+                if (fileKeyFromDb == null || fileKeyFromDb.isEmpty()) {
+                    throw SpeechFileKeyNotFoundException.EXCEPTION;
+                }
+
+                String rtzrId = returnZeroClient.rtzrSttFromS3(fileKeyFromDb);
+                transcriptionResponse = returnZeroClient.rtzrTranscription(rtzrId);
+
+                String jsonResponse = objectMapper.writeValueAsString(transcriptionResponse);
+                speech.setRawTranscription(jsonResponse);
+                needsNewAnalysis = true; // 새로 API 호출했으니 무조건 분석 필요
             }
 
-            String fileKeyFromDb = speech.getFileUrl();
-            if (fileKeyFromDb == null || fileKeyFromDb.isEmpty()) {
-                // fileKey가 DB에 없는 경우에 대한 예외 처리
-                throw SpeechFileKeyNotFoundException.EXCEPTION;
+            // ✅ 2. '새로 분석이 필요할 때만' verbalanalyze 호출 및 저장
+            if (needsNewAnalysis) {
+                log.info("Speech ID {}: 음성 분석(verbalanalyze)을 실행합니다.", speech.getId());
+                // 2-1. 분석 실행 (내부에서 VerbalAnalysisResult 생성 및 speech에 연결)
+                speechAnalysisResultService.verbalanalyze(speech, transcriptionResponse);
+
+                // 2-2. 'speech' 저장 (rawTranscription, 신규 VerbalAnalysisResult가 Cascade로 저장됨)
+                speechRepository.save(speech);
+                log.info("Speech 엔티티에 rawTranscription 및 새 분석 결과를 저장했습니다.");
             }
 
-            String rtzrId = returnZeroClient.rtzrSttFromS3(fileKeyFromDb);
-            TranscriptionResponse transcriptionResponse = returnZeroClient.rtzrTranscription(rtzrId);
-            String content = speechAnalysisResultService.verbalanalyze(speech, transcriptionResponse);
+            // ✅ 3. 불필요한 fileKeyFromDb 중복 체크 제거
+            // String fileKeyFromDb = speech.getFileUrl(); ... (이 부분 삭제)
 
-            speechRepository.save(speech);
+            // 4. 프론트엔드 반환용 DTO 생성
+            List<SentenceDto> sentences;
+            if (transcriptionResponse.results() == null || transcriptionResponse.results().utterances() == null) {
+                sentences = Collections.emptyList();
+            } else {
+                sentences = transcriptionResponse.results().utterances().stream()
+                        .map(SentenceDto::from)
+                        .collect(Collectors.toList());
+            }
 
-            return SpeechContentResponse.of(content);
+            // 5. 'sentencesJson' 저장 (이미 저장되어 있다면 중복 저장 방지)
+            VerbalAnalysisResult verbalResult = speech.getVerbalAnalysisResult();
+
+            if (verbalResult == null) {
+                // 이 로직이 실행되면 심각한 오류 (needsNewAnalysis=true일 때 생성되었어야 함)
+                log.error("Speech ID {}: 'sentencesJson' 저장 시점에 VerbalAnalysisResult가 null입니다.", speech.getId());
+                throw new IllegalStateException("VerbalAnalysisResult가 존재하지 않습니다.");
+            }
+
+            // ✅ 6. 'sentencesJson' 필드가 비어있을 때만 새로 저장 (불필요한 DB UPDATE 방지)
+            if (verbalResult.getSentencesJson() == null || verbalResult.getSentencesJson().isEmpty()) {
+                try {
+                    String sentencesJson = objectMapper.writeValueAsString(sentences);
+                    verbalResult.setSentencesJson(sentencesJson);
+
+                    // speech를 저장하여 verbalResult의 변경사항(sentencesJson)을 UPDATE
+                    speechRepository.save(speech);
+                    log.info("VerbalAnalysisResult에 sentencesJson을 저장했습니다.");
+
+                } catch (JsonProcessingException e) {
+                    log.error("sentences DTO 'List<SentenceDto>' JSON 직렬화 오류", e);
+                    // 이 저장이 실패해도, 사용자에게 응답은 정상적으로 반환합니다.
+                }
+            }
+
+            // 7. 최종 응답 반환
+            return SpeechSentenceResponse.of(sentences);
+
+        } catch (JsonProcessingException e) {
+            log.error("STT JSON 직렬화/역직렬화 오류 발생", e);
+            throw new RuntimeException("JSON 처리 중 오류가 발생했습니다.", e);
         } catch (Exception e) {
+            log.error("rtzrStt 처리 중 예외 발생", e);
             throw ReturnZeroException.EXCEPTION;
         }
 

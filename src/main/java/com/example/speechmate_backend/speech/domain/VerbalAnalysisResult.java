@@ -28,6 +28,24 @@ public class VerbalAnalysisResult {
     @Lob
     private String repeatedWordsJson; // 반복 단어/횟수 JSON
 
+    @Lob
+    @Column(columnDefinition = "TEXT")
+    private String sentencesJson;
+
     // getter, setter, constructor
+    public void setSentencesJson(String sentencesJson) {
+        this.sentencesJson = sentencesJson;
+    }
+
+    public void setSpeech(Speech speech) {
+        this.speech = speech;
+    }
+
+    public void updateAnalysis(long wordCnt, long syllableCnt, String silenceJson, String fillerJson) {
+        this.wordCnt = wordCnt;
+        this.syllableCnt = syllableCnt;
+        this.silenceJson = silenceJson;
+        this.fillerJson = fillerJson;
+    }
 }
 

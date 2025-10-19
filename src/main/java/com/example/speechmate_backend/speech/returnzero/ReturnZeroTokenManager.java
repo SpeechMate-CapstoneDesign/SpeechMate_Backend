@@ -9,7 +9,9 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Map;
 
 @Slf4j
@@ -53,8 +55,28 @@ public class ReturnZeroTokenManager {
 
         if (response != null && response.containsKey("access_token")) {
             this.accessToken = (String) response.get("access_token");
-            int expireAt = (int) response.get("expire_at");
-            this.tokenExpiresAt = LocalDateTime.now().plusSeconds(expireAt).minusMinutes(1);
+
+            Object expireAtObj = response.get("expire_at");
+            long expireAtTimestamp;
+
+            if (expireAtObj instanceof Number) {
+                expireAtTimestamp = ((Number) expireAtObj).longValue();
+            } else {
+                // 예외 처리 (String 등으로 올 경우)
+                try {
+                    expireAtTimestamp = Long.parseLong(expireAtObj.toString());
+                } catch (NumberFormatException e) {
+                    log.error("ReturnZero 'expire_at' 필드 파싱 실패: {}", expireAtObj);
+                    throw new RuntimeException("ReturnZero 토큰 응답 파싱 실패");
+                }
+            }
+
+            // Unix 타임스탬프(초)를 LocalDateTime으로 변환합니다.
+            this.tokenExpiresAt = LocalDateTime.ofInstant(
+                    Instant.ofEpochSecond(expireAtTimestamp), // Unix 타임스탬프(초) -> Instant
+                    ZoneId.systemDefault()                    // 시스템 기본 시간대
+            ).minusMinutes(1);
+
             log.info("새로운 RTZR 액세스 토큰이 발급되었습니다. 만료 시간: {}", tokenExpiresAt);
         } else {
             log.error("토큰 발급 실패: {}", response);

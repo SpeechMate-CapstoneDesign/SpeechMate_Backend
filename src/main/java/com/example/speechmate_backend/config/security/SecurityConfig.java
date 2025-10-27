@@ -33,7 +33,11 @@ public class SecurityConfig {
 
         http.
                 authorizeHttpRequests((auth) -> auth
-                        .requestMatchers("/api/auth/**", "/swagger-ui.html","/swagger-ui/**", "/api/speech/test/**",
+                        .requestMatchers("/api/auth/oauth/kakao/login",
+                                "/api/auth/oauth/kakao/signup",
+                                "/api/auth/test",
+                                "/api/auth/issue-id-token",
+                                "/api/auth/reissue", "/swagger-ui.html","/swagger-ui/**", "/api/speech/test/**",
                                 "/v3/api-docs/**", // OpenAPI 3 문서 JSON
                                 "/swagger-resources/**", // Swagger 리소스
                                 "/webjars/**" // Swagger UI 정적 리소스

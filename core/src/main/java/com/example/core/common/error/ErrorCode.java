@@ -2,7 +2,7 @@ package com.example.core.common.error;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import org.apache.http.HttpStatus;
+import org.apache.hc.core5.http.HttpStatus;
 
 @AllArgsConstructor
 @Getter

@@ -1,3 +1,5 @@
 rootProject.name = 'SpeechMate_Backend'
 include 'notification'
 include 'core'
+include 'eureka-server'
+include 'gateway'

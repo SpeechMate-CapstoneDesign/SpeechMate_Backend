@@ -114,6 +114,9 @@ dependencies {
     //h2
     runtimeOnly 'com.h2database:h2'
 
+    //fcm
+    implementation 'com.google.firebase:firebase-admin:9.3.0'
+
 }
 
 dependencyManagement {

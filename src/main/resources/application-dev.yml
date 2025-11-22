@@ -65,8 +65,9 @@ management:
 ffmpeg:
   path: /usr/bin/ffmpeg
 
-
-# TODO env에 넣어주기
 returnzero:
   client-id: ${RETURN_ZERO_CLIENT_ID}
   client-secret: ${RETURN_ZERO_CLIENT_SECRET}
+
+firebase:
+  key: ${FIREBASE_KEY}

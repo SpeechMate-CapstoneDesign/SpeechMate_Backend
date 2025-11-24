@@ -91,6 +91,11 @@ jobs:
             fi
 
             echo "새 컨테이너 준비 대기..."
+            sleep 5
+            echo "=== 컨테이너 로그 (시작 직후) ==="
+            docker logs capstone-server-$NEW_CONTAINER --tail 50
+            echo "=== 끝 ==="
+  
             READY=false
             for i in {1..30}; do
               if curl -s $HEALTH_URL | grep '"status":"UP"' > /dev/null; then
@@ -104,8 +109,15 @@ jobs:
 
             if [ "$READY" != true ]; then
               echo "❌ 새 컨테이너 헬스체크 실패 → 롤백 시작"
-
-              if [ "$NEW_CONTAINER" == "blue" ]; then
+              echo "=== 최종 로그 ==="
+              docker logs capstone-server-$NEW_CONTAINER --tail 100
+              echo "=== 끝 ==="
+            fi
+            
+            echo "✅ AI 워커 서비스 업데이트 완료. 콜백 타겟: $CALLBACK_HOST"
+            
+            
+            if [ "$NEW_CONTAINER" == "blue" ]; then
                 sudo sed -i -E 's|#*\s*server capstone-server-blue:8080;|    #server capstone-server-blue:8080;|' ./nginx/conf.d/default.conf
                 sudo sed -i -E 's|#*\s*server capstone-server-green:8080;|    server capstone-server-green:8080;|' ./nginx/conf.d/default.conf
               else
@@ -135,6 +147,11 @@ jobs:
             docker compose up -d ai-worker
             
             echo "AI 워커 준비 대기..."
+            sleep 5
+            echo "=== AI 워커 로그 (시작 직후) ==="
+            docker logs capstone-ai-worker --tail 50 2>/dev/null || echo "로그 없음"
+            echo "=== 끝 ==="
+            
             AI_READY=false
             for i in {1..15}; do # 45초 대기
               if curl -s capstone-ai-worker:8000/health | grep '"status":"ok"' > /dev/null; then
@@ -146,7 +163,10 @@ jobs:
               sleep 3
             done     
             if [ "$AI_READY" != true ]; then
-              echo "❌ AI 워커 헬스체크 실패 → Nginx 리로드 중단, 롤백 없음 (AI 워커는 싱글톤)"
+              echo "❌ AI 워커 헬스체크 실패"
+              echo "=== 최종 AI 워커 로그 ==="
+              docker logs capstone-ai-worker --tail 100 2>/dev/null || echo "로그 없음"
+              echo "=== 끝 ==="
             fi
 
             echo "✅ AI 워커 서비스 업데이트 완료. 콜백 타겟: $CALLBACK_HOST"

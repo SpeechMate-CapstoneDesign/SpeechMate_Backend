@@ -164,6 +164,5 @@ jobs:
             fi
             
             docker exec nginx-capstone nginx -s reload
-
             echo "구 컨테이너 종료 및 제거"
             docker compose rm -sf server-$OLD_CONTAINER

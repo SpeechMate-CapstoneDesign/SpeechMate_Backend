@@ -1,5 +1,5 @@
 # Python AI 워커용 Dockerfile
-FROM python:3.11-slim
+FROM python:3.11-slim-bullseye
 
 # 1. 시스템 의존성 설치 (OpenCV/MediaPipe Headless 실행에 필요)
 RUN apt-get update && apt-get install -y \

@@ -103,9 +103,6 @@ services:
       REDIS_HOST: my-cache-server
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD} # .env 파일에서 가져옴
-      # [Spring Callback Target]
-      # 이 값은 배포 스크립트에서 동적으로 설정됨
-      SPRING_CALLBACK_URL: http://capstone-server-blue:8080/api/callback/speech/non-verbal
       TZ: Asia/Seoul
     restart: always
     depends_on:

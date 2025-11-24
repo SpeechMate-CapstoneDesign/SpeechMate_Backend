@@ -137,7 +137,7 @@ jobs:
 
             AI_READY=false
             for i in {1..15}; do
-              if curl -s capstone-ai-worker:8000/health | grep '"status":"ok"' > /dev/null; then
+              if docker exec nginx-capstone curl -s capstone-ai-worker:8000/health | grep '"status":"ok"' > /dev/null; then
                 AI_READY=true
                 echo "AI 워커 준비 완료 ✅"
                 break

@@ -3,6 +3,7 @@ package com.example.speechmate_backend.fcm;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
+import com.google.gson.Gson;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,9 +31,12 @@ public class FirebaseConfig {
         if (FirebaseApp.getApps().isEmpty() && !trimmedJson.isEmpty() && !trimmedJson.equals("{}")) {
 
             try {
-                // 3. Trim된 JSON을 InputStream으로 변환
+                Gson gson = new Gson();
+                Object jsonObject = gson.fromJson(trimmedJson, Object.class);
+                String cleanJson = gson.toJson(jsonObject);
+
                 InputStream serviceAccount = new ByteArrayInputStream(
-                        trimmedJson.getBytes(StandardCharsets.UTF_8));
+                        cleanJson.getBytes(StandardCharsets.UTF_8)); // [FIX] 클린된 JSON 사용
 
                 FirebaseOptions options = FirebaseOptions.builder()
                         .setCredentials(GoogleCredentials.fromStream(serviceAccount))

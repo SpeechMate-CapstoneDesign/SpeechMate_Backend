@@ -100,6 +100,9 @@ jobs:
 
             if [ "$READY" != true ]; then
               echo "❌ 새 컨테이너 헬스체크 실패 → 롤백 시작"
+              echo "=== 최종 로그 (Spring Boot 에러) ==="
+              docker logs capstone-server-$NEW_CONTAINER --tail 100 # <-- 로그 유지
+              echo "=== 끝 ==="
             
               # Nginx 롤백 설정
               if [ "$NEW_CONTAINER" == "blue" ]; then

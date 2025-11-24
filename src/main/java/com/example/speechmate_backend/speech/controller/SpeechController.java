@@ -210,4 +210,13 @@ public class SpeechController {
     ) {
         speechService.testrtzrStt(rtzrId);
     }
+
+
+    @Operation(summary = "파이썬 서버와 비언어적 분석 통신")
+    @PostMapping("/nonverbal/{speechId}")
+    public ResponseEntity<NonVerbalAnalysisGateResponse> nonverbalcall(
+            @PathVariable Long speechId
+    ) {
+        return ResponseEntity.ok(speechService.requestNonVerbalAnalysis(speechId));
+    }
 }

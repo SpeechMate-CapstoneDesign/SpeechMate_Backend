@@ -9,6 +9,7 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.bind.annotation.RequestMapping;
 
 @Configuration
 @EnableWebSecurity
@@ -37,7 +38,7 @@ public class SecurityConfig {
                                 "/api/auth/oauth/kakao/signup",
                                 "/api/auth/test",
                                 "/api/auth/issue-id-token",
-                                "/api/auth/reissue", "/swagger-ui.html","/swagger-ui/**", "/api/speech/test/**",
+                                "/api/auth/reissue", "/swagger-ui.html","/swagger-ui/**", "/api/speech/test/**","/api/callback/speech/non-verbal",
                                 "/v3/api-docs/**", // OpenAPI 3 문서 JSON
                                 "/swagger-resources/**", // Swagger 리소스
                                 "/webjars/**" // Swagger UI 정적 리소스

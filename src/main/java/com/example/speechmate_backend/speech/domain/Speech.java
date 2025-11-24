@@ -2,6 +2,7 @@ package com.example.speechmate_backend.speech.domain;
 
 
 import com.example.speechmate_backend.common.BaseEntity;
+import com.example.speechmate_backend.speech.AnalysisStatus;
 import com.example.speechmate_backend.user.domain.User;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -58,6 +59,12 @@ public class Speech extends BaseEntity {
     @OneToOne(mappedBy = "speech", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private VerbalAnalysisResult verbalAnalysisResult;
 
+    @OneToOne(mappedBy = "speech", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private NonVerbalAnalysisResult nonVerbalAnalysisResult;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private AnalysisStatus nonVerbalStatus = AnalysisStatus.NOT_STARTED;
 
 
     public void setFileUrl(String fileUrl) {
@@ -91,5 +98,17 @@ public class Speech extends BaseEntity {
         if (verbalAnalysisResult != null) {
             verbalAnalysisResult.setSpeech(this); // 양방향 동기화
         }
+    }
+
+    public void setNonVerbalAnalysisResult(NonVerbalAnalysisResult nonVerbalAnalysisResult) {
+        this.nonVerbalAnalysisResult = nonVerbalAnalysisResult;
+        if (nonVerbalAnalysisResult != null) {
+            nonVerbalAnalysisResult.setSpeech(this); // 양방향 동기화
+        }
+    }
+
+    // 상태 변경을 위한 Setter
+    public void setNonVerbalStatus(AnalysisStatus nonVerbalStatus) {
+        this.nonVerbalStatus = nonVerbalStatus;
     }
 }

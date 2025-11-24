@@ -68,7 +68,7 @@ jobs:
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/capstone-ai-worker:latest
 
             echo "Creating .env file from GitHub Secrets..."
-            echo "${{ secrets.ENV_VARS }}" > ./.env
+            echo -e "${{ secrets.ENV_VARS }}" > ./.env
 
             CURRENT=$(docker ps --format '{{.Names}}' | grep server-blue || true)
 

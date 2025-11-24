@@ -92,8 +92,8 @@ services:
 
   ai-worker:
     build:
-      context: . # 현재 디렉토리를 빌드 컨텍스트로 사용
-      dockerfile: AI/Dockerfile # AI 폴더 내부의 Dockerfile 지정
+      context: ./AI # 현재 디렉토리를 빌드 컨텍스트로 사용
+      dockerfile: Dockerfile # AI 폴더 내부의 Dockerfile 지정
     container_name: capstone-ai-worker
     image: capstone-ai-worker:latest
     env_file:

@@ -65,7 +65,6 @@ jobs:
             
             echo "🔄 최신 이미지 pull..."
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/capstoneback:latest
-          # 2. Python AI 워커 이미지 pull (새로 빌드된 이미지 가져오기)
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/capstone-ai-worker:latest
 
             echo "Creating .env file from GitHub Secrets..."
@@ -123,24 +122,18 @@ jobs:
             
             echo "🔥 Python AI Worker 환경 변수 설정 및 재기동 시작..."
             
-            # 1. 콜백 호스트 계산 (새로 뜬 Spring 컨테이너를 바라보게 함)
             CALLBACK_HOST="capstone-server-$NEW_CONTAINER:8080"
                     
             NEW_CALLBACK_URL="SPRING_CALLBACK_URL=http://$CALLBACK_HOST/api/callback/speech/non-verbal"
-            # 1. [핵심 수정] 기존 SPRING_CALLBACK_URL 라인을 .env에서 삭제 (있다면)
-            #    (이 작업은 ENV_VARS에 동일 변수가 있더라도 안전하게 최신 값으로 덮어쓰기 위함)
             
             
             sudo sed -i '/^SPRING_CALLBACK_URL=/d' ./.env
             
-            # 2. 새로운 값을 파일 끝에 추가 (덮어쓰기 보장)
             echo "$NEW_CALLBACK_URL" >> ./.env
             
             
-            # 3. AI 워커 컨테이너 기동/업데이트 (새로운 .env 설정으로 재시작)
             docker compose up -d ai-worker
             
-            # 4. [추가] AI 워커 헬스 체크 (내부 포트 8000 확인)
             echo "AI 워커 준비 대기..."
             AI_READY=false
             for i in {1..15}; do # 45초 대기
@@ -154,7 +147,6 @@ jobs:
             done     
             if [ "$AI_READY" != true ]; then
               echo "❌ AI 워커 헬스체크 실패 → Nginx 리로드 중단, 롤백 없음 (AI 워커는 싱글톤)"
-            # AI 워커는 서비스 유지에 필수적이지 않으므로 Nginx 리로드는 중단하지 않고, 로그만 남김
             fi
 
             echo "✅ AI 워커 서비스 업데이트 완료. 콜백 타겟: $CALLBACK_HOST"

@@ -32,8 +32,6 @@ public class NonVerbalAnalysisResponse {
         StatisticsDto statsDto = new StatisticsDto(
                 entity.getTotalFloorEvents(),
                 entity.getTotalCeilingEvents(),
-                entity.getTotalLeftEvents(),
-                entity.getTotalRightEvents(),
                 entity.getTotalLipBiteEvents(),
                 entity.getTotalHandNearFaceEvents(),
                 entity.getTotalSlantEvents(),

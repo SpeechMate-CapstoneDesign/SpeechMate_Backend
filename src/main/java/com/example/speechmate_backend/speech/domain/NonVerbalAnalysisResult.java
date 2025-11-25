@@ -29,8 +29,6 @@ public class NonVerbalAnalysisResult {
     // (개별 컬럼으로 저장되어 DB에서 바로 조회 가능)
     private int totalFloorEvents;
     private int totalCeilingEvents;
-    private int totalLeftEvents;
-    private int totalRightEvents;
     private int totalLipBiteEvents;
     private int totalHandNearFaceEvents;
     private int totalSlantEvents;
@@ -61,8 +59,6 @@ public class NonVerbalAnalysisResult {
             StatisticsDto stats = response.getStatistics();
             this.totalFloorEvents = stats.getTotalFloorEvents();
             this.totalCeilingEvents = stats.getTotalCeilingEvents();
-            this.totalLeftEvents = stats.getTotalLeftEvents();
-            this.totalRightEvents = stats.getTotalRightEvents();
             this.totalLipBiteEvents = stats.getTotalLipBiteEvents();
             this.totalHandNearFaceEvents = stats.getTotalHandNearFaceEvents();
             this.totalSlantEvents = stats.getTotalSlantEvents();

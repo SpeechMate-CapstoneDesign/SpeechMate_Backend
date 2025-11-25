@@ -11,10 +11,11 @@ public class StatisticsDto {
     // --- 기존 Head/Face/Slant ---
     private int totalFloorEvents;
     private int totalCeilingEvents;
-    private int totalLeftEvents;
-    private int totalRightEvents;
+    //private int totalLeftEvents;
+    //private int totalRightEvents;
     private int totalSlantEvents;
     private int totalBlinkEvents;
+    //경직된 차려자세
 
     // --- 기존 Hand/Mouth ---
     private int totalLipBiteEvents;

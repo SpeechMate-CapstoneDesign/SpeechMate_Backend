@@ -586,7 +586,7 @@ public AnalysisResultDto getSpeechContentAnalysisById(Long speechId) {
             log.warn("비언어적 분석 재요청 거부 (Speech ID: {}). 이미 'COMPLETED' 상태입니다.", speechId);
             NonVerbalAnalysisResponse dto = getSpeechNonVerbalAnalysisDto(speech.getNonVerbalAnalysisResult());
             return NonVerbalAnalysisGateResponse.builder()
-                    .status(currentStatus)
+                    .analysisStatus(currentStatus)
                     .result(dto)
                     .build();
         }

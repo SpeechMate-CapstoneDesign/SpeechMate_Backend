@@ -214,9 +214,9 @@ public class SpeechController {
 
     @Operation(summary = "파이썬 서버와 비언어적 분석 통신")
     @PostMapping("/nonverbal/{speechId}")
-    public ResponseEntity<NonVerbalAnalysisGateResponse> nonverbalcall(
+    public ResponseEntity<ApiResponse<NonVerbalAnalysisGateResponse>> nonverbalcall(
             @PathVariable Long speechId
     ) {
-        return ResponseEntity.ok(speechService.requestNonVerbalAnalysis(speechId));
+        return ResponseEntity.ok(ApiResponse.ok(speechService.requestNonVerbalAnalysis(speechId)));
     }
 }

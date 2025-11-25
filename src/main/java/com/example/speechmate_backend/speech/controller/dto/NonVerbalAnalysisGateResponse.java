@@ -9,7 +9,7 @@ import lombok.Getter;
 public class NonVerbalAnalysisGateResponse {
 
     // 현재 분석 상태 (NOT_STARTED, IN_PROGRESS, COMPLETED, FAILED)
-    private final AnalysisStatus status;
+    private final AnalysisStatus analysisStatus;
 
     // COMPLETED일 경우에만 값이 채워짐
     private final NonVerbalAnalysisResponse result;
@@ -17,7 +17,7 @@ public class NonVerbalAnalysisGateResponse {
     // Helper method: status만 반환할 때 사용
     public static NonVerbalAnalysisGateResponse statusOnly(AnalysisStatus status) {
         return NonVerbalAnalysisGateResponse.builder()
-                .status(status)
+                .analysisStatus(status)
                 .build();
     }
 }

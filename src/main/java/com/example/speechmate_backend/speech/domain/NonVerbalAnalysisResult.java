@@ -70,7 +70,6 @@ public class NonVerbalAnalysisResult {
             this.totalFigLeafPoseEvents = stats.getTotalFigLeafPoseEvents();
         }
 
-        // 2. 타임스탬프 로그(analysisLog)를 JSON 문자열로 직렬화
         if (response.getAnalysisLog() != null) {
             try {
                 this.analysisLogJson = objectMapper.writeValueAsString(response.getAnalysisLog());

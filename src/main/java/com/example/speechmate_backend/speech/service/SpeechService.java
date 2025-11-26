@@ -15,7 +15,6 @@ import com.example.speechmate_backend.speech.domain.AnalysisResult;
 import com.example.speechmate_backend.speech.domain.NonVerbalAnalysisResult;
 import com.example.speechmate_backend.speech.domain.Speech;
 import com.example.speechmate_backend.speech.domain.VerbalAnalysisResult;
-import com.example.speechmate_backend.speech.repository.NonVerbalAnalysisResultRepository;
 import com.example.speechmate_backend.speech.repository.SpeechCustomRepository;
 import com.example.speechmate_backend.speech.repository.SpeechRepository;
 import com.example.speechmate_backend.speech.returnzero.ReturnZeroClient;
@@ -30,7 +29,6 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -60,6 +58,7 @@ public class SpeechService {
 
     // Redis Stream에 사용할 작업 큐 이름 (상수)
     private static final String STREAM_KEY = "nonverbal-analysis-jobs";
+    private static final int MAX_STREAM_LENGTH = 10000;
 
     @Value("${spring.ai.openai.api-key}")
     private String openAiApiKey;
@@ -594,7 +593,12 @@ public AnalysisResultDto getSpeechContentAnalysisById(Long speechId) {
         // [수정] 2. 분석 중인 건 중복 요청 불가
         if (currentStatus == AnalysisStatus.IN_PROGRESS) {
             log.warn("비언어적 분석 중복 요청 거부 (Speech ID: {}). 현재 'IN_PROGRESS' 상태입니다.", speechId);
-            return NonVerbalAnalysisGateResponse.statusOnly(currentStatus); // 409 Conflict
+            return NonVerbalAnalysisGateResponse.statusOnly(currentStatus);
+        }
+
+        if (currentStatus == AnalysisStatus.FAILED) {
+            log.warn("비언어적 분석 실패 (Speech ID: {}). 현재 'FAILED' 상태입니다.", speechId);
+            return NonVerbalAnalysisGateResponse.statusOnly(currentStatus);
         }
 
         // (여기부터는 NOT_STARTED 또는 FAILED 상태만 넘어옴)

@@ -15,7 +15,7 @@ import org.springframework.stereotype.Service;
 public class FcmService {
 
     /**
-     * 특정 사용자에게 비어어적 분석 완료 알림을 비동기로 전송
+     * 특정 사용자에게 비언어적 분석 완료 알림을 비동기로 전송
      * 쿨다운 로직은 현재 적용 X
      */
     @Async
@@ -23,6 +23,11 @@ public class FcmService {
         if (fcmToken == null || fcmToken.isEmpty()) {
             log.warn("FCM 토큰이 없어 사용자에게 알림을 전송할 수 없습니다. (Speech ID: {})", speechId);
             return;
+        }
+
+        // speechTitle이 null이거나 비어있을 경우 기본값 설정 (NPE 방지)
+        if (speechTitle == null || speechTitle.trim().isEmpty()) {
+            speechTitle = "미정 (분석 파일)";
         }
 
         FcmNotificationType type = FcmNotificationType.ANALYSIS_COMPLETED;

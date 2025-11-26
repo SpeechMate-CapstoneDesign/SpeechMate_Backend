@@ -43,7 +43,7 @@ def process_stream_message(job_id, job_data):
 
         # 2. [수정 반영] run_analysis 함수를 호출하여 실제 분석 수행
         #    (run_analysis 내부의 5초 대기가 실행됨)
-        analysis_result = run_analysis(s3_key)
+        analysis_result = run_analysis(s3_key, speech_id)
 
         # 3. Spring Callback API 호출
         log.info(f"Spring으로 콜백 전송 (Speech ID: {speech_id})...")

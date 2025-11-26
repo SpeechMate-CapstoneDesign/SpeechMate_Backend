@@ -41,6 +41,13 @@ jobs:
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/capstoneback .
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/capstoneback
 
+      - name: Build and push Python AI worker image
+        run: |
+          AI_IMAGE_NAME=${{ secrets.DOCKERHUB_USERNAME }}/capstone-ai-worker
+          echo "Building Python AI Worker image..."
+
+          docker build -t $AI_IMAGE_NAME:latest -f AI/Dockerfile ./AI
+          docker push $AI_IMAGE_NAME:latest
   deploy:
     runs-on: ubuntu-latest
     needs: build
@@ -55,12 +62,13 @@ jobs:
           script: |
             set -e
             cd /home/ubuntu/capstone
-            
-            echo "🔄 최신 이미지 pull..."
+                        
+            echo "🔄 최신 이미지 pull 시작..."
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/capstoneback:latest
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/capstone-ai-worker:latest
 
             echo "Creating .env file from GitHub Secrets..."
-            echo "${{ secrets.ENV_VARS }}" > ./.env
+            echo "${{ secrets.ENV_VARS }}" > ./.env # .env 파일 생성
 
             CURRENT=$(docker ps --format '{{.Names}}' | grep server-blue || true)
 
@@ -69,22 +77,18 @@ jobs:
               docker compose up -d server-blue
               NEW_CONTAINER="blue"
               OLD_CONTAINER="green"
-              sudo sed -i -E 's|#*\s*server capstone-server-blue:8080;|    server capstone-server-blue:8080;|' ./nginx/conf.d/default.conf
-              sudo sed -i -E 's|#*\s*server capstone-server-green:8080;|    #server capstone-server-green:8080;|' ./nginx/conf.d/default.conf
               HEALTH_URL="http://localhost:8080/actuator/health"
             else
               echo "현재 server-blue가 살아있음 → green 컨테이너 기동"
               docker compose up -d server-green
               NEW_CONTAINER="green"
               OLD_CONTAINER="blue"
-              sudo sed -i -E 's|#*\s*server capstone-server-green:8080;|    server capstone-server-green:8080;|' ./nginx/conf.d/default.conf
-              sudo sed -i -E 's|#*\s*server capstone-server-blue:8080;|    #server capstone-server-blue:8080;|' ./nginx/conf.d/default.conf
               HEALTH_URL="http://localhost:8081/actuator/health"
             fi
 
             echo "새 컨테이너 준비 대기..."
             READY=false
-            for i in {1..30}; do
+            for i in {1..45}; do
               if curl -s $HEALTH_URL | grep '"status":"UP"' > /dev/null; then
                 READY=true
                 echo "서버 준비 완료 ✅"
@@ -96,7 +100,11 @@ jobs:
 
             if [ "$READY" != true ]; then
               echo "❌ 새 컨테이너 헬스체크 실패 → 롤백 시작"
-
+              echo "=== 최종 로그 (Spring Boot 에러) ==="
+              docker logs capstone-server-$NEW_CONTAINER --tail 100 # <-- 로그 유지
+              echo "=== 끝 ==="
+            
+              # Nginx 롤백 설정
               if [ "$NEW_CONTAINER" == "blue" ]; then
                 sudo sed -i -E 's|#*\s*server capstone-server-blue:8080;|    #server capstone-server-blue:8080;|' ./nginx/conf.d/default.conf
                 sudo sed -i -E 's|#*\s*server capstone-server-green:8080;|    server capstone-server-green:8080;|' ./nginx/conf.d/default.conf
@@ -110,10 +118,51 @@ jobs:
               echo "롤백 완료 → $OLD_CONTAINER 컨테이너로 서비스 유지"
               exit 1
             fi
+            
+            echo "🔥 Python AI Worker 환경 변수 설정 및 재기동 시작..."
+            
+            CALLBACK_HOST="capstone-server-$NEW_CONTAINER:8080"
+            NEW_CALLBACK_URL="SPRING_CALLBACK_URL=http://$CALLBACK_HOST/api/callback/speech/non-verbal"
+            
+            sudo sed -i '/^SPRING_CALLBACK_URL=/d' ./.env 
+            
+            echo "$NEW_CALLBACK_URL" >> ./.env
+            
+            docker compose up -d ai-worker
+            
+            echo "AI 워커 준비 대기..."
+            echo "=== AI 워커 로그 (시작 직후) ==="
+            docker logs capstone-ai-worker --tail 50 2>/dev/null || echo "로그 없음"
+            echo "=== 끝 ==="
 
+            AI_READY=false
+            for i in {1..15}; do
+              if docker exec nginx-capstone curl -s capstone-ai-worker:8000/health | grep '"status":"ok"' > /dev/null; then
+                AI_READY=true
+                echo "AI 워커 준비 완료 ✅"
+                break
+              fi
+              echo "AI 워커 준비중... ($i)"
+              sleep 3
+            done     
+            if [ "$AI_READY" != true ]; then
+              echo "❌ AI 워커 헬스체크 실패"
+              echo "=== 최종 AI 워커 로그 ==="
+              docker logs capstone-ai-worker --tail 100 2>/dev/null || echo "로그 없음"
+              echo "=== 끝 ==="
+            fi
+
+            echo "✅ AI 워커 서비스 업데이트 완료. 콜백 타겟: $CALLBACK_HOST"            
             echo "✅ 새 컨테이너 정상 기동, Nginx reload"
+            
+            if [ "$NEW_CONTAINER" == "blue" ]; then
+              sudo sed -i -E 's|#*\s*server capstone-server-blue:8080;|    server capstone-server-blue:8080;|' ./nginx/conf.d/default.conf
+              sudo sed -i -E 's|#*\s*server capstone-server-green:8080;|    #server capstone-server-green:8080;|' ./nginx/conf.d/default.conf
+            else
+              sudo sed -i -E 's|#*\s*server capstone-server-green:8080;|    server capstone-server-green:8080;|' ./nginx/conf.d/default.conf
+              sudo sed -i -E 's|#*\s*server capstone-server-blue:8080;|    #server capstone-server-blue:8080;|' ./nginx/conf.d/default.conf
+            fi
+            
             docker exec nginx-capstone nginx -s reload
-
             echo "구 컨테이너 종료 및 제거"
             docker compose rm -sf server-$OLD_CONTAINER
-

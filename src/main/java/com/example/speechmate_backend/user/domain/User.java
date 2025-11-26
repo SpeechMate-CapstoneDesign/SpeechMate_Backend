@@ -33,11 +33,17 @@ public class User extends BaseEntity {
     @Embedded
     private OauthInfo oauthInfo;
 
+    String fcmToken;
+
     public void addSpeech(Speech speech) {
         this.speechs.add(speech);
         if(speech.getUser() != this) {
             speech.setUser(this);
         }
+    }
+
+    public void setFcmToken(String fcmToken) {
+        this.fcmToken = fcmToken;
     }
 
 }

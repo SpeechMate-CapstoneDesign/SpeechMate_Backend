@@ -2,6 +2,7 @@ package com.example.speechmate_backend.speech;
 
 import com.example.speechmate_backend.common.exception.UploadLimitExceededException;
 import com.example.speechmate_backend.config.redis.RedisUtil;
+import com.example.speechmate_backend.fcm.FirebaseConfig;
 import com.example.speechmate_backend.s3.config.S3Config;
 import com.example.speechmate_backend.s3.service.S3UploadPresignedUrlService;
 import com.example.speechmate_backend.speech.controller.SpeechRestClient;
@@ -78,6 +79,9 @@ public class SpeechTest {
 
     @MockBean
     private ReturnZeroClient returnZeroClient;
+
+    @MockBean
+    private FirebaseConfig firebaseConfig;
 
 
     private Speech speech;

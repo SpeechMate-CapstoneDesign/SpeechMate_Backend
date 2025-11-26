@@ -6,6 +6,7 @@ import lombok.Builder;
 @Builder
 public record SpeechConfigDto(
         Long duration,
+        String title,
         String fileType,
         String presentationContext,
         String audience,
@@ -16,6 +17,7 @@ public record SpeechConfigDto(
     public static SpeechConfigDto from(Speech speech, String s3Url) {
         return SpeechConfigDto.builder()
                 .duration(speech.getDuration())
+                .title(speech.getTitle())
                 .fileType(speech.getFileType())
                 .presentationContext(speech.getPresentationContext())
                 .audience(speech.getAudience())

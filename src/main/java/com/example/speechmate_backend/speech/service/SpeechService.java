@@ -7,10 +7,12 @@ import com.example.speechmate_backend.config.redis.RedisUtil;
 import com.example.speechmate_backend.s3.MediaFileExtension;
 import com.example.speechmate_backend.s3.controller.dto.VoiceKeyDto;
 import com.example.speechmate_backend.s3.service.S3UploadPresignedUrlService;
+import com.example.speechmate_backend.speech.AnalysisStatus;
 import com.example.speechmate_backend.speech.controller.SortType;
 import com.example.speechmate_backend.speech.controller.SpeechRestClient;
 import com.example.speechmate_backend.speech.controller.dto.*;
 import com.example.speechmate_backend.speech.domain.AnalysisResult;
+import com.example.speechmate_backend.speech.domain.NonVerbalAnalysisResult;
 import com.example.speechmate_backend.speech.domain.Speech;
 import com.example.speechmate_backend.speech.domain.VerbalAnalysisResult;
 import com.example.speechmate_backend.speech.repository.SpeechCustomRepository;
@@ -26,6 +28,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +36,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 
@@ -50,6 +54,11 @@ public class SpeechService {
     private final ReturnZeroClient returnZeroClient;
     private final RedisUtil redisUtil;
     private final ObjectMapper objectMapper;
+    private final RedisTemplate<String, String> redisTemplate;
+
+    // Redis Stream에 사용할 작업 큐 이름 (상수)
+    private static final String STREAM_KEY = "nonverbal-analysis-jobs";
+    private static final int MAX_STREAM_LENGTH = 10000;
 
     @Value("${spring.ai.openai.api-key}")
     private String openAiApiKey;
@@ -541,5 +550,88 @@ public AnalysisResultDto getSpeechContentAnalysisById(Long speechId) {
         VerbalAnalysisResult verbalAnalysisResult = speech.getVerbalAnalysisResult();
 
         return VerbalAnalysisDto.from(verbalAnalysisResult);
+    }
+
+    @Transactional(readOnly = true)
+    public NonVerbalAnalysisResponse getSpeechNonVerbalAnalysisDto(NonVerbalAnalysisResult result) {
+        if (result == null) return null;
+        // DTO 변환 로직은 SpeechCallbackService에서 사용했던 objectMapper를 사용
+        return NonVerbalAnalysisResponse.from(result, objectMapper);
+    }
+
+    /**
+     * Python 서버에 비언어적 분석을 "요청"합니다. (비동기)
+     * Redis Pub/Sub 대신 Streams (XADD)를 사용.
+     * 완료된 작업은 재요청을 거부
+     *
+     * @param speechId 분석할 Speech의 ID
+     * @return 202 (Accepted) 또는 409 (Conflict)
+     */
+    @Transactional // (상태 조회 및 변경을 위해 트랜잭션 사용)
+    public NonVerbalAnalysisGateResponse requestNonVerbalAnalysis(Long speechId) {
+
+        Speech speech = speechRepository.findById(speechId)
+                .orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
+
+        String s3Key = speech.getFileUrl();
+        if (s3Key == null || s3Key.isEmpty()) {
+            throw SpeechFileKeyNotFoundException.EXCEPTION; // (FileKey 예외가 있다고 가정)
+        }
+
+        AnalysisStatus currentStatus = speech.getNonVerbalStatus();
+
+        // [수정] 1. 완료된 건 재요청 불가 -> 분석 결과를 불러오는걸로
+        if (currentStatus == AnalysisStatus.COMPLETED) {
+            log.warn("비언어적 분석 재요청 거부 (Speech ID: {}). 이미 'COMPLETED' 상태입니다.", speechId);
+            NonVerbalAnalysisResponse dto = getSpeechNonVerbalAnalysisDto(speech.getNonVerbalAnalysisResult());
+            return NonVerbalAnalysisGateResponse.builder()
+                    .analysisStatus(currentStatus)
+                    .result(dto)
+                    .build();
+        }
+
+        // [수정] 2. 분석 중인 건 중복 요청 불가
+        if (currentStatus == AnalysisStatus.IN_PROGRESS) {
+            log.warn("비언어적 분석 중복 요청 거부 (Speech ID: {}). 현재 'IN_PROGRESS' 상태입니다.", speechId);
+            return NonVerbalAnalysisGateResponse.statusOnly(currentStatus);
+        }
+
+        if (currentStatus == AnalysisStatus.FAILED) {
+            log.warn("비언어적 분석 실패 (Speech ID: {}). 현재 'FAILED' 상태입니다.", speechId);
+            return NonVerbalAnalysisGateResponse.statusOnly(currentStatus);
+        }
+
+        // (여기부터는 NOT_STARTED 또는 FAILED 상태만 넘어옴)
+
+        // 3. Redis Stream에 보낼 메시지(Job) 생성
+        // (Python이 speechId와 s3Key를 모두 알아야 함)
+        NonVerbalAnalysisRequest requestDto = new NonVerbalAnalysisRequest(speechId, s3Key);
+
+        try {
+            // 4. [핵심 수정] Streams에 작업(Job)을 추가 (XADD)
+            // Python이 작업을 JSON으로 쉽게 파싱할 수 있도록 body 필드 하나에 직렬화
+            String messageBody = objectMapper.writeValueAsString(requestDto);
+            Map<String, String> jobData = Collections.singletonMap("job", messageBody);
+
+            // Stream에 메시지 추가
+            redisTemplate.opsForStream().add(STREAM_KEY, jobData);
+
+            // (참고: MapRecord.create(STREAM_KEY, jobData)를 사용하는 방법도 있습니다)
+
+            // 5. [핵심] 상태를 'IN_PROGRESS' (분석 중)으로 변경
+            speech.setNonVerbalStatus(AnalysisStatus.IN_PROGRESS);
+            speechRepository.save(speech); // 상태 변경 저장
+
+            log.info("비언어적 분석 작업 Stream 발행 (Speech ID: {}). 상태: IN_PROGRESS", speechId);
+
+            return NonVerbalAnalysisGateResponse.statusOnly(AnalysisStatus.IN_PROGRESS);
+
+        } catch (JsonProcessingException e) {
+            log.error("Redis Stream 작업 직렬화 실패 (Speech ID: {}): {}", speechId, e.getMessage(), e);
+            throw new RuntimeException("작업 생성 중 오류가 발생했습니다.", e);
+        } catch (Exception e) {
+            log.error("Redis Stream 발행 실패 (Speech ID: {}): {}", speechId, e.getMessage(), e);
+            throw new RuntimeException("작업 발행 중 오류가 발생했습니다.", e);
+        }
     }
 }

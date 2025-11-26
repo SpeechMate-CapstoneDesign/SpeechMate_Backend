@@ -15,12 +15,14 @@ import com.example.speechmate_backend.oauth.dto.OauthLoginResponse;
 import com.example.speechmate_backend.oauth.helper.KakaoOauthHelper;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
 
+@Slf4j
 @RequiredArgsConstructor
 @Service
 public class UserService {
@@ -102,5 +104,20 @@ public class UserService {
         userRepository.delete(user);
 
         redisUtil.deleteRefreshToken(userId.toString());
+    }
+
+    @Transactional
+    public void registerFcmToken(Long userId, String fcmToken) {
+        if (fcmToken == null || fcmToken.isEmpty()) {
+            log.warn("User ID {}의 FCM 토큰이 빈 값이므로 업데이트를 건너뜁니다.", userId);
+            return;
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> UserNotFoundException.EXCEPTION);
+
+        user.setFcmToken(fcmToken);
+        // @Transactional 이므로 save() 호출 없이 트랜잭션 종료 시 업데이트됨.
+        log.info("User ID {}의 FCM 토큰이 업데이트되었습니다.", userId);
     }
 }

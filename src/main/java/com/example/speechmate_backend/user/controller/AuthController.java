@@ -61,8 +61,8 @@ public class AuthController {
 /*
 * idtoken 발급 테스트용
 * */
-@Operation(summary = "테스트용 코드 수신", description = "백엔드에서 카카오 redirect_uri에 붙는 code 값을 수신합니다. (테스트용)")
-@GetMapping("/test")
+    @Operation(summary = "테스트용 코드 수신", description = "백엔드에서 카카오 redirect_uri에 붙는 code 값을 수신합니다. (테스트용)")
+    @GetMapping("/test")
     public ResponseEntity<String> receiveCode(@Parameter(description = "카카오 인증 후 redirect_uri에 포함된 code") @RequestParam String code) {
         return ResponseEntity.ok("코드 잘 받음: " + code);
     }

@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+redis
+requests
+numpy
+mediapipe
+opencv-python-headless
+boto3

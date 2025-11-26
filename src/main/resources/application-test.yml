@@ -31,3 +31,19 @@ spring:
 returnzero:
   client-id: dummy-client-id
   client-secret: dummy-client-secret
+
+firebase:
+  key: '{
+    "type": "dummy",
+    "project_id": "dummy-dummy",
+    "private_key_id": "dummy",
+    "private_key": "dummy",
+    "client_email": "dummy",
+    "client_id": "dummy",
+    "auth_uri": "dummy",
+    "token_uri": "dummy",
+    "auth_provider_x509_cert_url": "dummy",
+    "client_x509_cert_url": "dummy",
+    "universe_domain": "dummy"
+  }  
+  '

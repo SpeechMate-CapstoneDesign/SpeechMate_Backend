@@ -13,7 +13,7 @@ public class NonVerbalAnalysisGateResponse {
 
     // COMPLETED일 경우에만 값이 채워짐
     private final NonVerbalAnalysisResponse result;
-
+    
     // Helper method: status만 반환할 때 사용
     public static NonVerbalAnalysisGateResponse statusOnly(AnalysisStatus status) {
         return NonVerbalAnalysisGateResponse.builder()

@@ -94,7 +94,7 @@ services:
     build:
       context: ./AI # 현재 디렉토리를 빌드 컨텍스트로 사용
       dockerfile: Dockerfile # AI 폴더 내부의 Dockerfile 지정
-    container_name: capstone-ai-worker
+    container_name: s13121312/capstone-ai-worker
     image: capstone-ai-worker:latest
     env_file:
       - .env # Redis 비밀번호 등 공유 환경 변수 로드

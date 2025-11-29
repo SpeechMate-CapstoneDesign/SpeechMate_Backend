@@ -15,7 +15,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # 4. 소스 코드 복사 (AI 폴더 컨텍스트에서 실행됨)
-COPY main.py nonverbal_analysis.py spring_callback.py ./
+COPY main.py nonverbal_analysis.py spring_callback.py gesture_detector_video.py ./
 
 # 5. Uvicorn 서버 실행 (포트 8000)
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

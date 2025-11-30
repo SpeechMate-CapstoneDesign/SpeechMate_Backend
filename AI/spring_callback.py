@@ -28,7 +28,7 @@ def send_callback_to_spring(speech_id: int, analysis_result: dict, status: str):
         payload["response"] = None
 
     try:
-        response = requests.post(SPRING_CALLBACK_URL, json=payload, timeout=10)
+        response = requests.post(SPRING_CALLBACK_URL, json=payload, timeout=60)
 
         if 200 <= response.status_code < 300:
             log.info(f"Spring 콜백 성공 (Speech ID: {speech_id}, Status: {status})")

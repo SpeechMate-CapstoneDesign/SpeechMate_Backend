@@ -2,13 +2,10 @@ package com.example.speechmate_backend.s3.service;
 
 import com.amazonaws.HttpMethod;
 import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.Headers;
-import com.amazonaws.services.s3.model.CannedAccessControlList;
 import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest;
 import com.amazonaws.services.s3.model.S3Object;
 import com.example.speechmate_backend.s3.MediaFileExtension;
 import com.example.speechmate_backend.s3.controller.dto.VoiceKeyDto;
-import com.example.speechmate_backend.s3.controller.dto.VoiceRecordDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;

@@ -85,7 +85,7 @@ public class JwtUtil {
     }
 
     public TokenReissueResponse reissueToken(String refreshToken) {
-        // 1. Refresh Token 유효성 검증
+        // 1. )Refresh Token 유효성 검증
         validateRefreshToken(refreshToken);
 
         // 2. 사용자 ID 추출

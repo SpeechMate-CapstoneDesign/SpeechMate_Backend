@@ -25,7 +25,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -329,7 +328,6 @@ public class SpeechService {
         return dto;
     }
 
-    @CacheEvict(value = "speechFeedCache", allEntries = true)
     @Transactional
     public SpeechS3CallbackDto registerUploadedSpeech(Long userId, String fileKey, Long durationSeconds) {
         User user = userRepository.findById(userId)
@@ -435,7 +433,6 @@ public class SpeechService {
 
 
 @Transactional(readOnly = true)
-//@Cacheable(value = "speechFeedCache", key = "#userId + '_' + #lastSpeechId + '_' + #limit + '_' + #sortType")
 public SpeechPagingFeedDto getMySpeecheFeed(Long userId, Long lastSpeechId, int limit, SortType sortType) {
     List<SpeechFeedDto> rawDtos = speechCustomRepository.findMyFeed(userId, lastSpeechId, limit + 1, sortType);
 
@@ -471,7 +468,6 @@ public SpeechPagingFeedDto getMySpeecheFeed(Long userId, Long lastSpeechId, int 
             .build();
 }
 
-@CacheEvict(value = "speechFeedCache", allEntries = true)
 @Transactional
 public SpeechIdDto addMetadataToSpeech(Long speechId, SpeechMetadataRequestDto requestDto, Long userId) {
     Speech speech = speechRepository.findById(speechId)
@@ -526,7 +522,6 @@ public AnalysisResultDto getSpeechContentAnalysisById(Long speechId) {
 }
 
 
-    @CacheEvict(value = "speechFeedCache", allEntries = true)
     public void deleteSpeechById(Long speechId, Long userId) {
         Speech speech = speechRepository.findById(speechId).orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
 

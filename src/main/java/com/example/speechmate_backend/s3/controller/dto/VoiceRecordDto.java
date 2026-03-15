@@ -1,7 +1,6 @@
 package com.example.speechmate_backend.s3.controller.dto;
 
 import lombok.Builder;
-import lombok.Getter;
 
 @Builder
 public record VoiceRecordDto(

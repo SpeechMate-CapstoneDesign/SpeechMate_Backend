@@ -74,4 +74,4 @@
 
 <br><br>
 
-<img width="700" height="600" alt="image" src="https://github.com/user-attachments/assets/6d33d72c-3d99-4386-b9f8-993e7411d46e" />
+<img width="1398" height="628" alt="스피치_구조도" src="https://github.com/user-attachments/assets/de01aa40-086b-4a3b-8637-34d16941f488" />

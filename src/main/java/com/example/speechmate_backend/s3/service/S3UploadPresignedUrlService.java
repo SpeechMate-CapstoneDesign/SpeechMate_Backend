@@ -6,6 +6,8 @@ import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest;
 import com.amazonaws.services.s3.model.S3Object;
 import com.example.speechmate_backend.s3.MediaFileExtension;
 import com.example.speechmate_backend.s3.controller.dto.VoiceKeyDto;
+import com.example.speechmate_backend.s3.domain.PendingUpload;
+import com.example.speechmate_backend.s3.repository.PendingUploadRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -19,6 +21,7 @@ import java.util.UUID;
 public class S3UploadPresignedUrlService {
 
     private final AmazonS3 amazonS3;
+    private final PendingUploadRepository pendingUploadRepository;
 
     @Value("${cloud.aws.s3.bucket}")
     private String bucket;
@@ -35,6 +38,9 @@ public class S3UploadPresignedUrlService {
         URL url = amazonS3.generatePresignedUrl(
                 getGeneratePreSignedUrlRequest(bucket, fileName, fileExtension)
         );
+
+        pendingUploadRepository.save(new PendingUpload(fileName, userId));
+
         return VoiceKeyDto.of(url.toString(), fileName);
     }
 
@@ -91,5 +97,8 @@ public class S3UploadPresignedUrlService {
         amazonS3.deleteObject(bucket, key);
     }
 
+    public long getObjectContentLength(String key) {
+        return amazonS3.getObjectMetadata(bucket, key).getContentLength();
+    }
 
 }

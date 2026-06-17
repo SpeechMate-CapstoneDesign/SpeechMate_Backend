@@ -1,9 +1,12 @@
+name: monitoring
+
 services:
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
     volumes:
-      - /home/ubuntu/capstone/conf/prometheus.yml:/etc/prometheus/prometheus.yml
+#      - /home/ubuntu/capstone/conf/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./conf/prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
       - "9090:9090"
     networks:
@@ -23,31 +26,43 @@ services:
     depends_on:
       - prometheus
 
-  loki:
-    image: grafana/loki:latest
-    container_name: loki
-    command: -config.file=/mnt/config/config.yml
-    volumes:
-      - /home/ubuntu/capstone/conf/loki-config.yml:/mnt/config/config.yml:ro
-    ports:
-      - "3100:3100"
-    networks:
-      - capstone-net
-    restart: always
+#  loki:
+#    image: grafana/loki:latest
+#    container_name: loki
+#    command: -config.file=/mnt/config/config.yml
+#    volumes:
+#      - /home/ubuntu/capstone/conf/loki-config.yml:/mnt/config/config.yml:ro
+#    ports:
+#      - "3100:3100"
+#    networks:
+#      - capstone-net
+#    restart: always
+#
+#  promtail:
+#    container_name: promtail
+#    image: grafana/promtail:latest
+#    command: -config.file=/etc/promtail/config.yml
+#    volumes:
+#      - /home/ubuntu/capstone/conf/promtail-config.yml:/etc/promtail/config.yml
+#      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+#      - /var/run/docker.sock:/var/run/docker.sock
+#    networks:
+#      - capstone-net
+#    restart: always
+#    depends_on:
+#      - loki
 
-  promtail:
-    container_name: promtail
-    image: grafana/promtail:latest
-    command: -config.file=/etc/promtail/config.yml
-    volumes:
-      - /home/ubuntu/capstone/conf/promtail-config.yml:/etc/promtail/config.yml
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
-      - /var/run/docker.sock:/var/run/docker.sock
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: redis-exporter
+    environment:
+      - REDIS_ADDR=redis://host.docker.internal:6379
+      - REDIS_PASSWORD=redis1234
+    ports:
+      - "9121:9121"
     networks:
       - capstone-net
     restart: always
-    depends_on:
-      - loki
 
 networks:
   capstone-net:

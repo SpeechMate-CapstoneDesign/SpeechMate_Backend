@@ -3,9 +3,12 @@ package com.example.speechmate_backend.speech.service;
 import com.example.speechmate_backend.common.ApiResponse;
 import com.example.speechmate_backend.common.aop.DistributedLock;
 import com.example.speechmate_backend.common.exception.*;
+import com.amazonaws.services.s3.model.AmazonS3Exception;
 import com.example.speechmate_backend.config.redis.RedisUtil;
 import com.example.speechmate_backend.s3.MediaFileExtension;
 import com.example.speechmate_backend.s3.controller.dto.VoiceKeyDto;
+import com.example.speechmate_backend.s3.domain.PendingUpload;
+import com.example.speechmate_backend.s3.repository.PendingUploadRepository;
 import com.example.speechmate_backend.s3.service.S3UploadPresignedUrlService;
 import com.example.speechmate_backend.speech.AnalysisStatus;
 import com.example.speechmate_backend.speech.controller.SortType;
@@ -54,6 +57,7 @@ public class SpeechService {
     private final RedisUtil redisUtil;
     private final ObjectMapper objectMapper;
     private final RedisTemplate<String, String> redisTemplate;
+    private final PendingUploadRepository pendingUploadRepository;
 
     // Redis Stream에 사용할 작업 큐 이름 (상수)
     private static final String STREAM_KEY = "nonverbal-analysis-jobs";
@@ -328,19 +332,48 @@ public class SpeechService {
         return dto;
     }
 
+    private static final long MAX_FILE_SIZE_BYTES = 500L * 1024 * 1024; // 500MB
+
     @Transactional
     public SpeechS3CallbackDto registerUploadedSpeech(Long userId, String fileKey, Long durationSeconds) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> UserNotFoundException.EXCEPTION);
 
-        Speech speech = new Speech();
-        speech.setFileUrl(fileKey); // 실제 s3 key
+        String ext = fileKey.contains(".")
+                ? fileKey.substring(fileKey.lastIndexOf('.') + 1).toUpperCase()
+                : "";
+        try {
+            MediaFileExtension.valueOf(ext);
+        } catch (IllegalArgumentException e) {
+            throw InvalidFileExtensionException.EXCEPTION;
+        }
 
-        String mediaType = fileKey.toLowerCase().endsWith(".mp4") || fileKey.toLowerCase().endsWith(".mov") ? "VIDEO" : "AUDIO";
+        PendingUpload pending = pendingUploadRepository
+                .findByS3KeyAndUserId(fileKey, userId)
+                .orElseThrow(() -> SpeechFileKeyNotFoundException.EXCEPTION);
+
+        try {
+            long fileSize = s3UploadPresignedUrlService.getObjectContentLength(fileKey);
+            if (fileSize > MAX_FILE_SIZE_BYTES) {
+                s3UploadPresignedUrlService.deleteObject(fileKey);
+                throw FileTooLargeException.EXCEPTION;
+            }
+        } catch (AmazonS3Exception e) {
+            log.error("S3 파일 메타데이터 조회 실패 (key={}): {}", fileKey, e.getMessage());
+            throw SpeechFileKeyNotFoundException.EXCEPTION;
+        }
+
+        Speech speech = new Speech();
+        speech.setFileUrl(fileKey);
+
+        String mediaType = ext.equals("MP4") || ext.equals("MOV") ? "VIDEO" : "AUDIO";
         speech.updateMediaInfo(durationSeconds, mediaType);
 
         user.addSpeech(speech);
         speechRepository.save(speech);
+
+        pendingUploadRepository.delete(pending);
+
         String s3Url = s3UploadPresignedUrlService.getPublicS3Url(speech.getFileUrl());
         return SpeechS3CallbackDto.of(speech.getId(), s3Url);
     }
@@ -610,6 +643,7 @@ public AnalysisResultDto getSpeechContentAnalysisById(Long speechId) {
 
             // Stream에 메시지 추가
             redisTemplate.opsForStream().add(STREAM_KEY, jobData);
+            redisTemplate.opsForStream().trim(STREAM_KEY, MAX_STREAM_LENGTH);
 
             // (참고: MapRecord.create(STREAM_KEY, jobData)를 사용하는 방법도 있습니다)
 

@@ -130,12 +130,12 @@ jobs:
             
             echo "AI 워커 준비 대기..."
             echo "=== AI 워커 로그 (시작 직후) ==="
-            docker logs capstone-ai-worker --tail 50 2>/dev/null || echo "로그 없음"
+            docker compose logs ai-worker --tail 50 2>/dev/null || echo "로그 없음"
             echo "=== 끝 ==="
 
             AI_READY=false
             for i in {1..15}; do
-              if docker exec nginx-capstone curl -s capstone-ai-worker:8000/health | grep '"status":"ok"' > /dev/null; then
+              if docker exec nginx-capstone curl -s ai-worker:8000/health | grep '"status":"ok"' > /dev/null; then
                 AI_READY=true
                 echo "AI 워커 준비 완료 ✅"
                 break
@@ -146,7 +146,7 @@ jobs:
             if [ "$AI_READY" != true ]; then
               echo "❌ AI 워커 헬스체크 실패"
               echo "=== 최종 AI 워커 로그 ==="
-              docker logs capstone-ai-worker --tail 100 2>/dev/null || echo "로그 없음"
+              docker compose logs ai-worker --tail 100 2>/dev/null || echo "로그 없음"
               echo "=== 끝 ==="
             fi
 

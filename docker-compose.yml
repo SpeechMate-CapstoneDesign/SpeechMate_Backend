@@ -95,8 +95,11 @@ services:
       - capstone-net
 
   ai-worker:
-    container_name: capstone-ai-worker
+    # container_name 없음 — 고정 이름이 있으면 replicas/--scale이 안 됨.
+    # 스케일: AI_WORKER_REPLICAS=3 docker compose up -d ai-worker  (consumer 이름은 hostname 기반이라 자동으로 구분됨)
     image: s13121312/capstone-ai-worker:latest
+    deploy:
+      replicas: ${AI_WORKER_REPLICAS:-1}
     env_file:
       - .env # Redis 비밀번호 등 공유 환경 변수 로드
     environment:

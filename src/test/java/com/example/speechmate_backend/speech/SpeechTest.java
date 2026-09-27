@@ -25,6 +25,12 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.cache.CacheManager;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.domain.Range;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.connection.stream.MapRecord;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.util.List;
@@ -53,6 +59,12 @@ public class SpeechTest {
 
     @Autowired
     private RedisUtil redisUtil;
+
+    @Autowired
+    private PlatformTransactionManager txManager;
+
+    @Autowired
+    private RedisConnectionFactory redisConnectionFactory;
 
     // 추가 MockBean: SpeechService의 다른 의존성들
     @MockBean
@@ -212,6 +224,38 @@ public class SpeechTest {
         // 6번째는 예외 발생
         assertThrows(UploadLimitExceededException.class,
                 () -> redisUtil.uploadlimit(userId));
+    }
+
+    @Test
+    @DisplayName("비언어 분석 요청은 트랜잭션 커밋 후에만 Stream에 발행된다 (롤백 시 유령 작업 없음)")
+    void nonverbal_job_is_published_only_after_commit() {
+        // SpeechService는 @MockBean이 아닌 실제 RedisTemplate<String,String>을 쓰므로 실제 Stream을 검증한다
+        String streamKey = "nonverbal-analysis-jobs";
+        StringRedisTemplate redis = new StringRedisTemplate(redisConnectionFactory);
+        redis.delete(streamKey);
+        try {
+            // 롤백: 안쪽 @Transactional은 바깥 트랜잭션에 참여하므로 바깥이 롤백되면 afterCommit이 실행되지 않아야 한다
+            new TransactionTemplate(txManager).execute(status -> {
+                speechService.requestNonVerbalAnalysis(speech.getId());
+                status.setRollbackOnly();
+                return null;
+            });
+            assertThat(redis.opsForStream().size(streamKey)).isZero();
+            assertThat(speechRepository.findById(speech.getId()).get().getNonVerbalStatus())
+                    .isEqualTo(AnalysisStatus.NOT_STARTED);
+
+            // 커밋: 정확히 1건 발행(speechId + s3Key 포함)되고 상태는 IN_PROGRESS
+            speechService.requestNonVerbalAnalysis(speech.getId());
+            List<MapRecord<String, Object, Object>> records = redis.opsForStream().range(streamKey, Range.unbounded());
+            assertThat(records).hasSize(1);
+            assertThat((String) records.get(0).getValue().get("job"))
+                    .contains("\"speechId\":" + speech.getId())
+                    .contains("test-file-key.mp3");
+            assertThat(speechRepository.findById(speech.getId()).get().getNonVerbalStatus())
+                    .isEqualTo(AnalysisStatus.IN_PROGRESS);
+        } finally {
+            redis.delete(streamKey);
+        }
     }
 
 }

@@ -34,6 +34,8 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Collections;
@@ -624,12 +626,7 @@ public AnalysisResultDto getSpeechContentAnalysisById(Long speechId) {
             return NonVerbalAnalysisGateResponse.statusOnly(currentStatus);
         }
 
-        if (currentStatus == AnalysisStatus.FAILED) {
-            log.warn("비언어적 분석 실패 (Speech ID: {}). 현재 'FAILED' 상태입니다.", speechId);
-            return NonVerbalAnalysisGateResponse.statusOnly(currentStatus);
-        }
-
-        // (여기부터는 NOT_STARTED 또는 FAILED 상태만 넘어옴)
+        // (여기부터는 NOT_STARTED 또는 FAILED 상태만 넘어옴 — FAILED는 재요청 허용)
 
         // 3. Redis Stream에 보낼 메시지(Job) 생성
         // (Python이 speechId와 s3Key를 모두 알아야 함)
@@ -641,11 +638,16 @@ public AnalysisResultDto getSpeechContentAnalysisById(Long speechId) {
             String messageBody = objectMapper.writeValueAsString(requestDto);
             Map<String, String> jobData = Collections.singletonMap("job", messageBody);
 
-            // Stream에 메시지 추가
-            redisTemplate.opsForStream().add(STREAM_KEY, jobData);
-            redisTemplate.opsForStream().trim(STREAM_KEY, MAX_STREAM_LENGTH);
-
-            // (참고: MapRecord.create(STREAM_KEY, jobData)를 사용하는 방법도 있습니다)
+            // XADD는 트랜잭션 커밋 후에 실행 — 롤백 시 DB에 없는 작업이 스트림에만 남는 것을 방지.
+            // 커밋 후 XADD가 실패하면 상태는 IN_PROGRESS로 남지만,
+            // NonVerbalAnalysisTimeoutScheduler가 FAILED로 전환하고 FAILED는 재요청 가능하므로 자가 복구됨.
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    redisTemplate.opsForStream().add(STREAM_KEY, jobData);
+                    redisTemplate.opsForStream().trim(STREAM_KEY, MAX_STREAM_LENGTH, true); // approximate trim(~)
+                }
+            });
 
             // 5. [핵심] 상태를 'IN_PROGRESS' (분석 중)으로 변경
             speech.setNonVerbalStatus(AnalysisStatus.IN_PROGRESS);

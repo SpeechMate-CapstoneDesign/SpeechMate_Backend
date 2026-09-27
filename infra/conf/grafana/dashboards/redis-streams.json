@@ -1,0 +1,87 @@
+{
+  "uid": "redis-streams-nonverbal",
+  "title": "Redis Streams - 비언어 분석 작업 큐",
+  "tags": ["redis", "streams", "nonverbal"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1, "type": "stat", "title": "DLQ 적재 건수",
+      "description": "0이어야 정상. 1 이상이면 파싱 불능 메시지 또는 3회 이상 워커 크래시를 유발한 작업이 격리된 것 → XRANGE nonverbal-analysis-dlq - + 로 확인",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus-monitoring" },
+      "targets": [{ "refId": "A", "expr": "max(redis_stream_length{stream=\"nonverbal-analysis-dlq\"})" }],
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" },
+        "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "none" }
+    },
+    {
+      "id": 2, "type": "stat", "title": "미ACK(pending) 작업",
+      "description": "워커가 가져갔지만 아직 ACK하지 않은 작업 수. 분석 중인 건이 포함되므로 워커 수보다 지속적으로 크면 워커가 죽었거나 정체된 것",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus-monitoring" },
+      "targets": [{ "refId": "A", "expr": "max(redis_stream_group_messages_pending{stream=\"nonverbal-analysis-jobs\",group=\"analysis-group\"})" }],
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" },
+        "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 3 }, { "color": "red", "value": 10 }] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "none" }
+    },
+    {
+      "id": 3, "type": "stat", "title": "처리 대기(lag)",
+      "description": "발행됐지만 아직 어떤 워커도 읽지 않은 작업 수. 계속 증가하면 워커 처리량 부족",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus-monitoring" },
+      "targets": [{ "refId": "A", "expr": "max(redis_stream_group_lag{stream=\"nonverbal-analysis-jobs\",group=\"analysis-group\"})" }],
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" },
+        "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 5 }, { "color": "red", "value": 20 }] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "none" }
+    },
+    {
+      "id": 4, "type": "stat", "title": "활성 consumer 수",
+      "description": "consumer group에 등록된 워커 수 (hostname 기반 이름). 0이면 워커 전멸",
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus-monitoring" },
+      "targets": [{ "refId": "A", "expr": "max(redis_stream_group_consumers{stream=\"nonverbal-analysis-jobs\",group=\"analysis-group\"})" }],
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" },
+        "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "none" }
+    },
+    {
+      "id": 5, "type": "timeseries", "title": "큐 길이 / pending / lag 추이",
+      "gridPos": { "x": 0, "y": 5, "w": 12, "h": 9 },
+      "datasource": { "type": "prometheus", "uid": "prometheus-monitoring" },
+      "targets": [
+        { "refId": "A", "legendFormat": "스트림 길이(MAXLEN~10000)", "expr": "redis_stream_length{stream=\"nonverbal-analysis-jobs\"}" },
+        { "refId": "B", "legendFormat": "pending(미ACK)", "expr": "redis_stream_group_messages_pending{stream=\"nonverbal-analysis-jobs\",group=\"analysis-group\"}" },
+        { "refId": "C", "legendFormat": "lag(미읽음)", "expr": "redis_stream_group_lag{stream=\"nonverbal-analysis-jobs\",group=\"analysis-group\"}" },
+        { "refId": "D", "legendFormat": "DLQ", "expr": "redis_stream_length{stream=\"nonverbal-analysis-dlq\"}" }
+      ],
+      "fieldConfig": { "defaults": { "custom": { "lineWidth": 2, "fillOpacity": 10 } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+    },
+    {
+      "id": 6, "type": "timeseries", "title": "consumer별 idle 시간 (초)",
+      "description": "마지막 상호작용 이후 경과. 빨간 선(600초)은 워커 reclaim 기준(RECLAIM_IDLE_MS) — 이 위로 올라간 consumer의 pending은 다른 워커가 회수함",
+      "gridPos": { "x": 12, "y": 5, "w": 12, "h": 9 },
+      "datasource": { "type": "prometheus", "uid": "prometheus-monitoring" },
+      "targets": [
+        { "refId": "A", "legendFormat": "{{consumer}}", "expr": "redis_stream_group_consumer_idle_seconds{stream=\"nonverbal-analysis-jobs\",group=\"analysis-group\"}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "lineWidth": 2, "thresholdsStyle": { "mode": "line" } },
+        "thresholds": { "mode": "absolute", "steps": [{ "color": "transparent", "value": null }, { "color": "red", "value": 600 }] } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+    },
+    {
+      "id": 7, "type": "timeseries", "title": "consumer별 pending 건수",
+      "description": "특정 consumer에 pending이 몰려 있고 idle이 길면 그 워커가 죽은 것",
+      "gridPos": { "x": 0, "y": 14, "w": 24, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus-monitoring" },
+      "targets": [
+        { "refId": "A", "legendFormat": "{{consumer}}", "expr": "redis_stream_group_consumer_messages_pending{stream=\"nonverbal-analysis-jobs\",group=\"analysis-group\"}" }
+      ],
+      "fieldConfig": { "defaults": { "custom": { "lineWidth": 2, "fillOpacity": 10 } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } }
+    }
+  ]
+}

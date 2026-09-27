@@ -20,6 +20,10 @@ services:
       - "3000:3000"
     volumes:
       - grafana-data:/var/lib/grafana
+      # 데이터소스·대시보드 자동 등록 (하위 폴더만 마운트 — plugins/alerting 미존재 에러 로그 방지)
+      - ./conf/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./conf/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./conf/grafana/dashboards:/var/lib/grafana/dashboards:ro
     networks:
       - capstone-net
     restart: always
@@ -58,6 +62,8 @@ services:
     environment:
       - REDIS_ADDR=redis://host.docker.internal:6379
       - REDIS_PASSWORD=redis1234
+      # 비언어 분석 작업 큐·DLQ의 길이/pending/consumer idle을 redis_stream_* 메트릭으로 노출
+      - REDIS_EXPORTER_CHECK_SINGLE_STREAMS=nonverbal-analysis-jobs,nonverbal-analysis-dlq
     ports:
       - "9121:9121"
     networks:

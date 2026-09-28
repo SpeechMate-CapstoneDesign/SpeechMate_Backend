@@ -1,5 +1,6 @@
 package com.example.speechmate_backend.common.aop;
 
+import com.example.speechmate_backend.common.exception.LockAcquisitionFailedException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -38,7 +39,8 @@ public class DistributedLockAop {
         try {
             boolean available = rLock.tryLock(distributedLock.waitTime(), distributedLock.leaseTime(), distributedLock.timeUnit());  // (2)
             if (!available) {
-                return false;
+                // 기존 'return false'는 반환 타입이 Boolean이 아닌 메서드에서 ClassCastException을 유발
+                throw LockAcquisitionFailedException.EXCEPTION;
             }
 
             return aopForTransaction.proceed(joinPoint);  // (3)
@@ -46,11 +48,13 @@ public class DistributedLockAop {
             throw new InterruptedException();
         } finally {
             try {
-                rLock.unlock();   // (4)
-            } catch (IllegalMonitorStateException e) {
-                log.warn("Redisson Lock Already UnLock serviceName: {}, key : {}",
-                        method.getName(), key
-                );
+                if (rLock.isHeldByCurrentThread()) {
+                    rLock.unlock();   // (4)
+                }
+            } catch (Exception e) {
+                // Redis 장애(페일오버 등) 중 unlock 실패 — 워치독 갱신이 멈추면 TTL(30s) 만료로 자동 해제되므로 로그만 남김
+                log.warn("Redisson unlock 실패 serviceName: {}, key: {}, cause: {}",
+                        method.getName(), key, e.getMessage());
             }
         }
     }

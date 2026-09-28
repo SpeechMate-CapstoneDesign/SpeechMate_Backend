@@ -25,7 +25,8 @@ public enum ErrorCode implements ErrorCodeIfs{
     FFMPEG_EXCEPTION("fail", HttpStatus.SC_INTERNAL_SERVER_ERROR, "파일 변환 중 오류 발생(ffmpeg)"),
     RETURN_ZERO_EXCEPTION("fail", HttpStatus.SC_INTERNAL_SERVER_ERROR, "ReturnZero stt 과정중 오류 발생"),
     UPLOAD_LIMIT_EXCEED("fail", HttpStatus.SC_TOO_MANY_REQUESTS, "이미 5회 업로드 했습니다."),
-    INVALID_FILE_EXTENSION("fail", HttpStatus.SC_BAD_REQUEST, "허용되지 않는 파일 확장자입니다.");
+    INVALID_FILE_EXTENSION("fail", HttpStatus.SC_BAD_REQUEST, "허용되지 않는 파일 확장자입니다."),
+    LOCK_ACQUISITION_FAILED("fail", HttpStatus.SC_CONFLICT, "동일한 요청이 이미 처리 중입니다. 잠시 후 다시 시도해주세요.");
 
     private final String status;
     private final Integer resultCode;

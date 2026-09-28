@@ -2,6 +2,8 @@ package com.example.speechmate_backend.common.exception;
 
 import com.example.speechmate_backend.common.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.redisson.client.RedisException;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -65,6 +67,23 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     public ResponseEntity<ApiResponse<String>> handleSmateException(SmateException ex) {
         return ResponseEntity.status(ex.getError().getResultCode())
                 .body(ApiResponse.fail(ex.getError()));
+    }
+
+    /**
+     * Redis 장애 (페일오버 다운타임 등) — 500 대신 명확한 503으로 응답.
+     * access token 검증은 Redis를 타지 않으므로 일반 API는 영향 없고,
+     * 로그인/재발급/로그아웃과 분산 락 구간만 이 응답을 받는다.
+     */
+    @ExceptionHandler({RedisConnectionFailureException.class, RedisException.class})
+    public ResponseEntity<ApiResponse<String>> handleRedisFailure(Exception ex) {
+        log.error("Redis 연결 장애: {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(ApiResponse.fail(
+                        "일시적인 저장소 장애입니다. 잠시 후 다시 시도해주세요.",
+                        HttpStatus.SERVICE_UNAVAILABLE.value(),
+                        null
+                ));
     }
 
 }

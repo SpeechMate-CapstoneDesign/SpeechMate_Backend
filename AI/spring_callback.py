@@ -7,6 +7,7 @@ import logging
 log = logging.getLogger(__name__)
 
 SPRING_CALLBACK_URL = os.getenv("SPRING_CALLBACK_URL")
+CALLBACK_SECRET = os.getenv("CALLBACK_SECRET", "")  # Spring이 같은 값으로 검증 (.env 공유)
 
 _RETRY_DELAYS = [5, 15, 45]
 
@@ -19,7 +20,8 @@ def send_callback_to_spring(speech_id: int, analysis_result: dict, status: str):
 
     for attempt, delay in enumerate(_RETRY_DELAYS, 1):
         try:
-            response = requests.post(SPRING_CALLBACK_URL, json=payload, timeout=60)
+            response = requests.post(SPRING_CALLBACK_URL, json=payload, timeout=60,
+                                     headers={"X-Callback-Secret": CALLBACK_SECRET})
             if 200 <= response.status_code < 300:
                 log.info(f"Spring 콜백 성공 (speechId={speech_id}, attempt={attempt})")
                 return

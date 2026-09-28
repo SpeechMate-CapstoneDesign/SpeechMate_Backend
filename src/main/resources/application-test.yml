@@ -47,3 +47,9 @@ firebase:
     "universe_domain": "dummy"
   }  
   '
+
+callback:
+  secret: test-callback-secret
+
+ffmpeg:
+  path: /usr/bin/ffmpeg   # SpeechRestClient 빈 생성용 (테스트에서 실제 호출 없음)

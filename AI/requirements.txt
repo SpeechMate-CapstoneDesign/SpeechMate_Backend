@@ -1,6 +1,6 @@
 fastapi
 uvicorn[standard]
-redis
+redis>=5.0,<9   # 8.x부터 기본 socket_timeout=5s — main.py에서 명시적으로 덮어씀
 requests
 numpy
 mediapipe

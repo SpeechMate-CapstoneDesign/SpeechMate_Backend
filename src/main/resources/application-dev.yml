@@ -71,3 +71,6 @@ returnzero:
 
 firebase:
   key: ${FIREBASE_KEY}
+
+callback:
+  secret: ${CALLBACK_SECRET}   # 워커(.env)와 공유, 콜백 헤더 X-Callback-Secret 검증용

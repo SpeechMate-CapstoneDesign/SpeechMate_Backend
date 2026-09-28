@@ -25,7 +25,11 @@ DLQ_STREAM_KEY = "nonverbal-analysis-dlq"  # 처리 불능 메시지 보관용 D
 CONSUMER_GROUP = "analysis-group"  # 소비자 그룹 (Python 서버 그룹)
 CONSUMER_NAME = f"analysis-consumer-{socket.gethostname()}"  # 워커별 고유해야 PEL 소유자 추적이 가능
 MAX_DELIVERIES = 3  # 이 횟수만큼 전달돼도 처리 못 한 메시지는 DLQ로 이동
+XREAD_BLOCK_MS = 5000  # 새 메시지 대기 시간 = 회수·종료 신호 확인 주기
 RECLAIM_IDLE_MS = int(os.getenv("RECLAIM_IDLE_MS", 10 * 60 * 1000))  # 죽은 워커의 pending 회수 기준 (기본 10분)
+SHUTDOWN_GRACE_S = int(os.getenv("SHUTDOWN_GRACE_S", 110))  # SIGTERM 후 진행 중 작업을 기다리는 시간 (compose stop_grace_period보다 짧게)
+stop_event = threading.Event()  # SIGTERM → 새 메시지는 그만 읽고 진행 중 작업만 끝낸다
+listener_thread = None
 
 # --- FastAPI 앱 초기화 ---
 app = FastAPI()
@@ -125,11 +129,16 @@ def redis_stream_listener():
     log.info("Redis Stream 리스너 시작. (Host: %s, Stream: %s, Consumer: %s)",
              REDIS_HOST, STREAM_KEY, CONSUMER_NAME)
 
-    r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, password=REDIS_PASSWORD, decode_responses=False)
+    # socket_timeout은 XREADGROUP block(5s)보다 충분히 길어야 한다.
+    # redis-py 8부터 기본 socket_timeout이 5초라 5초 블로킹 읽기와 경쟁해 TimeoutError가 나고,
+    # 기본 재시도(3회+지수 백오프)까지 겹치면 호출 한 번이 최대 60초 루프 밖에서 멈춘다
+    # → 그동안 pending 회수도 종료 신호 처리도 안 됨 (장애 주입 실험에서 회수 90초로 발견).
+    r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, password=REDIS_PASSWORD, decode_responses=False,
+                    socket_timeout=XREAD_BLOCK_MS / 1000 + 10, socket_connect_timeout=5)
 
     # 1. 초기화 — 실패해도 스레드가 죽지 않고 성공할 때까지 재시도
     #    (스레드가 죽으면 FastAPI는 살아 있는데 소비만 멈추는 '조용한 장애'가 됨)
-    while True:
+    while not stop_event.is_set():
         try:
             r.ping()
             log.info("Redis 연결 및 인증 성공.")
@@ -139,8 +148,8 @@ def redis_stream_listener():
             log.error(f"Redis 리스너 초기화 실패, 5초 후 재시도: {e}")
             time.sleep(5)
 
-    # 2. 무한 루프로 작업 감시 (pending 회수 → 새 메시지 소비)
-    while True:
+    # 2. 작업 감시 루프 (pending 회수 → 새 메시지 소비). stop_event가 서면 현재 작업까지만 하고 빠져나간다
+    while not stop_event.is_set():
         try:
             reclaim_pending(r)
 
@@ -150,7 +159,7 @@ def redis_stream_listener():
                 CONSUMER_NAME,
                 {STREAM_KEY: '>'},
                 count=1,
-                block=5000
+                block=XREAD_BLOCK_MS
             )
 
             if not messages:
@@ -178,14 +187,29 @@ def redis_stream_listener():
             log.error(f"Redis 리스너 루프 오류: {e}")
             time.sleep(5)
 
+    log.info("Redis Stream 리스너 종료 (진행 중이던 작업까지 처리 완료).")
+
 
 # --- FastAPI 앱 설정 ---
 
 @app.on_event("startup")
 def startup_event():
     # FastAPI 서버 시작 시, Redis 리스너를 별도 스레드로 실행
+    global listener_thread
     listener_thread = threading.Thread(target=redis_stream_listener, daemon=True)
     listener_thread.start()
+
+
+@app.on_event("shutdown")
+def shutdown_event():
+    # uvicorn이 SIGTERM을 받으면 여기로 온다. 리스너를 멈추고 진행 중 작업이 ACK까지 끝나길 기다린다.
+    # 이게 없으면 배포마다 처리 중이던 작업이 PEL에 남아 idle 기준(10분) 뒤에야 회수된다.
+    log.info("종료 신호 수신 — 새 작업 수신 중단, 진행 중 작업 대기 (최대 %ds)", SHUTDOWN_GRACE_S)
+    stop_event.set()
+    if listener_thread is not None:
+        listener_thread.join(timeout=SHUTDOWN_GRACE_S)
+        if listener_thread.is_alive():
+            log.error("진행 중 작업이 %ds 안에 끝나지 않아 강제 종료 — PEL 회수 경로로 복구됨", SHUTDOWN_GRACE_S)
 
 
 @app.get("/health")

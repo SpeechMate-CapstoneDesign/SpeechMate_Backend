@@ -22,6 +22,26 @@ docker compose down -v
 | 1 | 처리 중인 워커 컨테이너 `docker kill` | 다른 워커가 PEL 회수 → 완료, 유실 없음 | PASS. kill 후 32.3초에 worker-b가 회수(`idle 30s + 폴링`), 52.2초에 COMPLETED 콜백. DLQ 0 |
 | 2 | 같은 작업이 워커를 반복 크래시(`os._exit`) | 무한 재처리 대신 3회 후 DLQ + FAILED 콜백 | PASS. worker-b → worker-a → worker-a 순으로 3번 죽고(컨테이너 재시작 a+2, b+1) DLQ `max-deliveries-exceeded`, FAILED 콜백 1건 |
 | 3 | 처리 중 `docker restart redis` (AOF) | group·PEL 보존, 작업 완료, 콜백 중복 없음 | PASS. 재시작 직후 group 1개·PEL 1건 그대로, worker-a가 완료 후 ACK, COMPLETED 콜백 정확히 1건, 재접속 오류 로그 0건 |
+| 4 | 처리 중인 워커 `docker stop` (배포 상황) | SIGTERM 후 진행 중 작업을 끝내고 ACK한 뒤 종료, 회수 불필요 | PASS (2026-09-29). stop 반환 18.2초(남은 분석 시간), exit 0, COMPLETED 콜백, 다른 워커의 회수 없음 |
+
+## 부하 테스트 (2026-09-29)
+
+```bash
+docker compose --profile load up -d --build     # worker-c 포함
+python load-test.py --jobs 120 --sleep 1 --workers 1,2,3
+```
+
+| 워커 수 | 소진 시간 | 처리량 | 이론치 | 오버헤드 | 스케일 효율 |
+|---|---|---|---|---|---|
+| 1 | 122.5s | 0.98 건/s | 120s | +2% | 1.00x |
+| 2 | 62.3s | 1.93 건/s | 60s | +4% | 1.97x |
+| 3 | 42.2s | 2.84 건/s | 40s | +5% | 2.90x |
+
+큐 관점의 스케일 확인이지 실제 mediapipe 처리량은 아니다(분석은 1초 sleep stub).
+
+## 실험이 잡아낸 것 — redis-py 8 기본 socket_timeout
+
+시나리오 4를 추가해 재실행했더니 시나리오 1 회수가 52초 → 90초로 늘었다. 컨테이너의 redis-py가 8.1.0으로 올라가며 기본 `socket_timeout`이 5초가 됐고, `XREADGROUP block=5000`과 경쟁해 타임아웃 + 기본 재시도(3회, 지수 백오프)로 호출 한 번이 최대 60초 루프 밖에서 멈췄다(컨테이너 안 프로브: 10s, 59.7s, 58.5s, 59.3s, 35.8s). `main.py`에 `socket_timeout=block+10s`를 명시하고 `requirements.txt`를 `redis>=5.0,<9`로 고정한 뒤 회수 51.7초로 복귀.
 
 타임라인 전체는 실행 후 `data/timeline.txt`에 남는다.
 

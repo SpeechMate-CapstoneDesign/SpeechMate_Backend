@@ -7,6 +7,7 @@
   1. 처리 중 워커 컨테이너 docker kill      → 다른 워커가 PEL을 회수해 완료하는가, 몇 초 걸리는가
   2. 같은 작업이 워커를 반복 크래시시킴       → 3회 전달 후 DLQ로 격리되고 FAILED 콜백이 오는가 (restart 정책으로 되살아나는 워커 포함)
   3. 처리 중 Redis 재시작(AOF)             → consumer group·PEL이 보존되고 작업이 끝까지 가는가, 콜백이 중복되는가
+  4. 처리 중 워커 docker stop (배포 상황)   → SIGTERM을 받은 워커가 진행 중 작업을 끝내고 ACK한 뒤 종료하는가 (회수 대기 없이)
 """
 import json
 import os
@@ -17,6 +18,7 @@ import time
 import redis
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+os.chdir(HERE)  # docker compose 호출이 이 디렉토리의 compose 파일을 보도록
 CB_LOG = os.path.join(HERE, "data", "callbacks.log")
 STREAM, DLQ, GROUP = "nonverbal-analysis-jobs", "nonverbal-analysis-dlq", "analysis-group"
 IDLE_S = int(os.getenv("RECLAIM_IDLE_MS", 30000)) / 1000
@@ -33,7 +35,9 @@ def log(msg):
 
 
 def sh(*cmd):
-    return subprocess.run(cmd, capture_output=True, text=True).stdout.strip()
+    # docker logs는 컨테이너의 stderr(uvicorn·logging 출력)를 stderr로 내보내므로 둘 다 합친다
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    return (res.stdout + res.stderr).strip()
 
 
 def pel():
@@ -106,7 +110,7 @@ def scenario_1_docker_kill():
     log(f"콜백 = {[c[1:] for c in cbs]}  PEL = {pel()}  DLQ = {r.xlen(DLQ)}")
     recovery = (t_cb - t_kill) if t_cb else None
     log(f"복구 소요: kill → COMPLETED 콜백 {recovery:.1f}s (idle 기준 {IDLE_S:.0f}s + 폴링 + 분석 {os.getenv('ANALYSIS_SLEEP', 20)}s)" if recovery else "복구 실패")
-    sh("docker", "compose", "up", "-d", holder)  # docker kill은 restart 정책 대상이 아니라 직접 되살림
+    sh("docker", "compose", "--project-directory", HERE, "up", "-d", holder)  # docker kill은 restart 정책 대상이 아니라 직접 되살림
     log(f"{holder} 재기동")
     return ok and cbs and cbs[0][1:] == ("1", "COMPLETED") and not pel() and r.xlen(DLQ) == 0, recovery
 
@@ -145,6 +149,29 @@ def scenario_3_redis_restart():
     return ok and groups == [GROUP] and all(c[1:] == ("3", "COMPLETED") for c in cbs) and not pel(), len(cbs)
 
 
+def scenario_4_graceful_stop():
+    print("\n=== 시나리오 4: 처리 중 워커 docker stop (graceful shutdown) ===")
+    base = cb_count()
+    publish(4)
+    holder = wait(lambda: pel()[0][0] if pel() else None, 15)
+    time.sleep(2)
+    log(f"PEL = {pel()}  ({holder}가 분석 중)")
+    t_stop = time.time()
+    sh("docker", "stop", f"chaos-{holder}")  # SIGTERM → stop_grace_period 안에 스스로 종료해야 함
+    took = time.time() - t_stop
+    cbs = callbacks(base)
+    exit_code = sh("docker", "inspect", "-f", "{{.State.ExitCode}}", f"chaos-{holder}")
+    logs = sh("docker", "logs", f"chaos-{holder}")
+    log(f"docker stop 반환까지 {took:.1f}s, exit code {exit_code}, 콜백 = {[c[1:] for c in cbs]}, PEL = {pel()}")
+    log("워커 로그: 종료 신호 수신 " + str("종료 신호 수신" in logs) + ", 리스너 종료 " + str("리스너 종료" in logs))
+    reclaimed = "pending 회수" in sh("docker", "logs", "--since", f"{int(took) + 5}s", "chaos-worker-a" if holder == "worker-b" else "chaos-worker-b")
+    sh("docker", "compose", "--project-directory", HERE, "up", "-d", holder)
+    log(f"{holder} 재기동")
+    ok = (cbs and cbs[0][1:] == ("4", "COMPLETED") and not pel() and exit_code == "0" and not reclaimed
+          and took < 120)
+    return ok, took
+
+
 def _safe_ping():
     try:
         return r.ping()
@@ -157,10 +184,12 @@ if __name__ == "__main__":
     s1, recovery = scenario_1_docker_kill()
     s2 = scenario_2_repeated_crash()
     s3, cb_n = scenario_3_redis_restart()
+    s4, stop_took = scenario_4_graceful_stop()
     print("\n=== 결과 ===")
     print(f"1. docker kill 회수:      {'PASS' if s1 else 'FAIL'}  (복구 {recovery:.1f}s)" if recovery else "1. FAIL")
     print(f"2. 반복 크래시 → DLQ:     {'PASS' if s2 else 'FAIL'}")
     print(f"3. Redis 재시작 PEL 보존: {'PASS' if s3 else 'FAIL'}  (콜백 {cb_n}건{' — 중복' if cb_n > 1 else ''})")
+    print(f"4. docker stop 우아한 종료: {'PASS' if s4 else 'FAIL'}  (stop 반환 {stop_took:.1f}s, 회수 없이 완료)")
     with open(os.path.join(HERE, "data", "timeline.txt"), "w") as f:
         f.write("\n".join(timeline) + "\n")
-    sys.exit(0 if s1 and s2 and s3 else 1)
+    sys.exit(0 if s1 and s2 and s3 and s4 else 1)

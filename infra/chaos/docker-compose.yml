@@ -20,6 +20,7 @@ x-worker: &worker
   volumes:
     - ../../AI/main.py:/app/main.py:ro
     - ../../AI/spring_callback.py:/app/spring_callback.py:ro
+    - ../../AI/redis_conn.py:/app/redis_conn.py:ro
     - ./worker/nonverbal_analysis.py:/app/nonverbal_analysis.py:ro
   restart: always                                    # 운영 compose와 동일 — 크래시하면 도커가 되살린다
   stop_grace_period: 120s                            # 운영 compose와 동일 — docker stop 시 진행 중 작업을 끝낼 시간

@@ -8,6 +8,8 @@
   B. 같은 메시지로 워커가 3번 죽음 → 무한 재처리 대신 DLQ 이동 + FAILED 콜백
   C. 포이즌 메시지(JSON 깨짐) → 재시도 없이 즉시 DLQ
   D. 분석 로직 자체 실패 → FAILED 콜백 후 ACK(재시도는 사용자 재요청에 맡김)
+  E. 분석은 됐는데 Spring 콜백이 계속 실패 → ACK 보류, idle 뒤 회수돼 재처리, 결국 DLQ
+  F. 종료 시 pending 없는 소비자 이름은 그룹에서 제거, pending 있으면 유지
 """
 import json
 import os
@@ -23,7 +25,15 @@ analysis_calls, callbacks = [], []
 stub_analysis = types.ModuleType("nonverbal_analysis")
 stub_analysis.run_analysis = lambda s3_key, speech_id: analysis_calls.append(speech_id) or {"ok": True}
 stub_callback = types.ModuleType("spring_callback")
-stub_callback.send_callback_to_spring = lambda speech_id, result, status: callbacks.append((speech_id, status))
+callback_ok = [True]  # 시나리오 E에서 False로 바꿔 Spring 다운을 흉내
+
+
+def _stub_callback(speech_id, result, status, token=None):
+    callbacks.append((speech_id, status))
+    return callback_ok[0]
+
+
+stub_callback.send_callback_to_spring = _stub_callback
 sys.modules["nonverbal_analysis"] = stub_analysis
 sys.modules["spring_callback"] = stub_callback
 
@@ -44,6 +54,7 @@ def reset():
     main.ensure_group(r)
     analysis_calls.clear()
     callbacks.clear()
+    callback_ok[0] = True
 
 
 def publish(speech_id, body=None):
@@ -120,6 +131,38 @@ def test_d_analysis_failure_sends_failed_and_acks():
         main.run_analysis = original
     assert callbacks == [(4, "FAILED")]
     assert r.xlen(main.DLQ_STREAM_KEY) == 0, "분석 실패는 DLQ가 아니라 사용자 재요청 경로"
+
+
+def test_e_callback_failure_holds_ack_and_reprocesses():
+    reset()
+    publish(5)
+    callback_ok[0] = False  # Spring 다운
+    job_id, data = r.xreadgroup(GROUP, "worker", {main.STREAM_KEY: ">"}, count=1)[0][1][0]
+    assert main.process_stream_message(r, job_id, data) is False, "결과를 못 넘겼으면 ACK하지 않는다"
+    assert pending_count() == 1 and analysis_calls == [5]
+
+    time.sleep(0.3)
+    main.reclaim_pending(r)  # 2번째 전달: 다시 분석, 여전히 콜백 실패 → 계속 pending
+    assert analysis_calls == [5, 5] and pending_count() == 1
+
+    callback_ok[0] = True  # Spring 복구
+    time.sleep(0.3)
+    main.reclaim_pending(r)  # 3번째 전달: 성공 → ACK
+    assert analysis_calls == [5, 5, 5] and callbacks[-1] == (5, "COMPLETED")
+    assert pending_count() == 0 and r.xlen(main.DLQ_STREAM_KEY) == 0
+
+
+def test_f_consumer_deregistered_on_clean_exit_only():
+    reset()
+    publish(6)
+    job_id, data = r.xreadgroup(GROUP, main.CONSUMER_NAME, {main.STREAM_KEY: ">"}, count=1)[0][1][0]
+    names = lambda: {c["name"] for c in r.xinfo_consumers(main.STREAM_KEY, GROUP)}
+    main.deregister_consumer(r)
+    assert main.CONSUMER_NAME.encode() in names(), "pending이 있으면 지우면 안 됨 (DELCONSUMER는 pending을 버림)"
+
+    r.xack(main.STREAM_KEY, GROUP, job_id)
+    main.deregister_consumer(r)
+    assert main.CONSUMER_NAME.encode() not in names()
 
 
 if __name__ == "__main__":

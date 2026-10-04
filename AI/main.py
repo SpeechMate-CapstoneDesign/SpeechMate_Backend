@@ -11,6 +11,7 @@ import logging
 # --- (신규) 작업 모듈 임포트 ---
 from nonverbal_analysis import run_analysis
 from spring_callback import send_callback_to_spring
+from redis_conn import make_redis
 
 # --- 로깅 설정 ---
 logging.basicConfig(level=logging.INFO)
@@ -48,12 +49,14 @@ def move_to_dlq(r, job_id, job_data, reason):
 def process_stream_message(r, job_id, job_data):
     """
     메인 작업 처리 로직. True 반환 시 호출부에서 ACK.
+    False = ACK하지 말 것 (이미 DLQ로 보내 ACK했거나, 결과를 Spring에 못 넘겨 재처리가 필요한 경우).
     """
     # 1. 파싱은 별도로 시도 — 파싱 불능(포이즌) 메시지는 재시도 의미가 없으니 즉시 DLQ
     try:
         job = json.loads(job_data[b'job'].decode('utf-8'))
         speech_id = job['speechId']
         s3_key = job['s3FileKey']
+        job_token = job.get('jobToken')  # Spring이 이 시도의 콜백인지 판별하는 값 (구버전 메시지는 없음)
     except Exception as e:
         log.error(f"[작업 파싱 실패] (Job ID: {job_id}) 오류: {e}", exc_info=True)
         move_to_dlq(r, job_id, job_data, "parse-error")
@@ -67,12 +70,16 @@ def process_stream_message(r, job_id, job_data):
 
         # 3. Spring Callback API 호출
         log.info(f"Spring으로 콜백 전송 (Speech ID: {speech_id})...")
-        send_callback_to_spring(speech_id, analysis_result, "COMPLETED")
+        if not send_callback_to_spring(speech_id, analysis_result, "COMPLETED", job_token):
+            # 몇 분짜리 분석 결과를 버리지 않는다: ACK하지 않고 PEL에 남겨 idle 뒤 회수·재분석되게 한다.
+            # (MAX_DELIVERIES 넘으면 DLQ + FAILED 콜백으로 종결)
+            log.error(f"[콜백 실패, ACK 보류] (Job ID: {job_id}) Speech ID: {speech_id} — 회수 후 재처리 예정")
+            return False
     except Exception as e:
         log.error(f"[작업 실패] (Job ID: {job_id}) Speech ID: {speech_id} 오류: {e}", exc_info=True)
         # 분석 실패는 재시도해도 같은 결과일 가능성이 높음 → FAILED 콜백 후 ACK
-        # (Spring 쪽에서 FAILED 상태는 사용자가 재요청 가능)
-        send_callback_to_spring(speech_id, None, "FAILED")
+        # (Spring 쪽에서 FAILED 상태는 사용자가 재요청 가능. FAILED 콜백까지 실패하면 타임아웃 스케줄러가 정리)
+        send_callback_to_spring(speech_id, None, "FAILED", job_token)
 
     return True
 
@@ -82,33 +89,44 @@ def reclaim_pending(r):
     죽은 워커가 남긴 pending(PEL) 메시지를 회수해 재처리한다.
     MAX_DELIVERIES 이상 전달됐던 메시지는 반복 크래시 유발로 보고 DLQ로 보낸다.
     """
-    pending = r.xpending_range(
-        STREAM_KEY, CONSUMER_GROUP,
-        min='-', max='+', count=10, idle=RECLAIM_IDLE_MS
-    )
-    for p in pending:
-        claimed = r.xclaim(STREAM_KEY, CONSUMER_GROUP, CONSUMER_NAME,
-                           RECLAIM_IDLE_MS, [p['message_id']])
-        for job_id, job_data in claimed:
-            if job_data is None:
-                # 본문이 trim으로 이미 사라진 메시지 — ACK만 하고 정리
-                r.xack(STREAM_KEY, CONSUMER_GROUP, job_id)
-                continue
+    # XAUTOCLAIM = "idle 넘은 pending을 찾아서(XPENDING) 내 소유로(XCLAIM)"를 한 명령으로. min-idle 검사가 원자적이라
+    # 두 워커가 동시에 회수해도 한쪽만 가져간다. Redis 7은 trim으로 본문이 사라진 항목을 PEL에서 알아서 치우고
+    # 세 번째 반환값으로 알려준다 (6.2는 (id, None)으로 섞여 오므로 아래 None 처리 유지).
+    _next, claimed = r.xautoclaim(STREAM_KEY, CONSUMER_GROUP, CONSUMER_NAME,
+                                  RECLAIM_IDLE_MS, start_id='0-0', count=10)[:2]
+    for job_id, job_data in claimed:
+        if job_data is None:
+            r.xack(STREAM_KEY, CONSUMER_GROUP, job_id)
+            continue
 
-            if p['times_delivered'] >= MAX_DELIVERIES:
-                move_to_dlq(r, job_id, job_data, "max-deliveries-exceeded")
-                # 상태가 IN_PROGRESS로 남지 않도록 FAILED 콜백 시도
-                try:
-                    job = json.loads(job_data[b'job'].decode('utf-8'))
-                    send_callback_to_spring(job['speechId'], None, "FAILED")
-                except Exception:
-                    pass  # 콜백 실패 시 Spring 타임아웃 스케줄러가 정리
-                continue
+        # 전달 횟수는 XAUTOCLAIM 응답에 없어 따로 본다. 이번 회수로 이미 +1 된 값이라 '초과'로 비교.
+        delivered = r.xpending_range(STREAM_KEY, CONSUMER_GROUP, job_id, job_id, 1)[0]['times_delivered']
+        if delivered > MAX_DELIVERIES:
+            move_to_dlq(r, job_id, job_data, "max-deliveries-exceeded")
+            # 상태가 IN_PROGRESS로 남지 않도록 FAILED 콜백 시도
+            try:
+                job = json.loads(job_data[b'job'].decode('utf-8'))
+                send_callback_to_spring(job['speechId'], None, "FAILED", job.get('jobToken'))
+            except Exception:
+                pass  # 콜백 실패 시 Spring 타임아웃 스케줄러가 정리
+            continue
 
-            log.warning(f"[pending 회수] (Job ID: {job_id}) "
-                        f"{p['times_delivered']}번째 전달분 재처리 시도")
-            if process_stream_message(r, job_id, job_data):
-                r.xack(STREAM_KEY, CONSUMER_GROUP, job_id)
+        log.warning(f"[pending 회수] (Job ID: {job_id}) {delivered}번째 전달분 재처리 시도")
+        if process_stream_message(r, job_id, job_data):
+            r.xack(STREAM_KEY, CONSUMER_GROUP, job_id)
+
+
+def deregister_consumer(r):
+    """소비자 이름이 컨테이너 hostname이라 배포마다 새 이름이 생긴다. 안 지우면 XINFO CONSUMERS와
+    Grafana idle 패널이 죽은 이름으로 채워진다. pending이 남아 있으면 지우지 않는다 (DELCONSUMER는 pending을 버림)."""
+    try:
+        if r.xpending_range(STREAM_KEY, CONSUMER_GROUP, '-', '+', 1, consumername=CONSUMER_NAME):
+            log.warning("소비자 %s에 pending이 남아 있어 이름을 유지합니다 (회수 경로로 복구됨)", CONSUMER_NAME)
+            return
+        r.xgroup_delconsumer(STREAM_KEY, CONSUMER_GROUP, CONSUMER_NAME)
+        log.info("소비자 %s 등록 해제", CONSUMER_NAME)
+    except Exception as e:
+        log.warning("소비자 등록 해제 실패 (무시): %s", e)
 
 
 def ensure_group(r):
@@ -126,15 +144,15 @@ def redis_stream_listener():
     """
     Redis Stream을 구독하고 메시지를 처리하는 백그라운드 스레드 함수
     """
-    log.info("Redis Stream 리스너 시작. (Host: %s, Stream: %s, Consumer: %s)",
-             REDIS_HOST, STREAM_KEY, CONSUMER_NAME)
+    log.info("Redis Stream 리스너 시작. (Mode: %s, Host: %s, Stream: %s, Consumer: %s)",
+             os.getenv("REDIS_MODE", "standalone"), REDIS_HOST, STREAM_KEY, CONSUMER_NAME)
 
     # socket_timeout은 XREADGROUP block(5s)보다 충분히 길어야 한다.
     # redis-py 8부터 기본 socket_timeout이 5초라 5초 블로킹 읽기와 경쟁해 TimeoutError가 나고,
     # 기본 재시도(3회+지수 백오프)까지 겹치면 호출 한 번이 최대 60초 루프 밖에서 멈춘다
     # → 그동안 pending 회수도 종료 신호 처리도 안 됨 (장애 주입 실험에서 회수 90초로 발견).
-    r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, password=REDIS_PASSWORD, decode_responses=False,
-                    socket_timeout=XREAD_BLOCK_MS / 1000 + 10, socket_connect_timeout=5)
+    # 토폴로지(standalone/sentinel/cluster)는 REDIS_MODE로 고른다 (redis_conn.py).
+    r = make_redis(socket_timeout=XREAD_BLOCK_MS / 1000 + 10)
 
     # 1. 초기화 — 실패해도 스레드가 죽지 않고 성공할 때까지 재시도
     #    (스레드가 죽으면 FastAPI는 살아 있는데 소비만 멈추는 '조용한 장애'가 됨)
@@ -181,12 +199,15 @@ def redis_stream_listener():
                     log.error(f"그룹 재생성 실패: {ge}")
                     time.sleep(5)
             else:
-                log.error(f"Redis 리스너 루프 오류: {e}", exc_info=True)
+                log.error(f"Redis 리스너 루프 오류: {type(e).__name__}: {e}", exc_info=True)
                 time.sleep(5)
         except Exception as e:
-            log.error(f"Redis 리스너 루프 오류: {e}")
+            # 예외 클래스를 같이 남긴다 — 페일오버 중 ConnectionError / MasterNotFoundError / ClusterDownError 를 구분해야
+            # "어느 구간에서 무엇 때문에 멈췄는지"를 로그만으로 알 수 있다.
+            log.error(f"Redis 리스너 루프 오류: {type(e).__name__}: {e}")
             time.sleep(5)
 
+    deregister_consumer(r)
     log.info("Redis Stream 리스너 종료 (진행 중이던 작업까지 처리 완료).")
 
 

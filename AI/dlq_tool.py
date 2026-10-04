@@ -7,7 +7,7 @@ usage:
   python dlq_tool.py list                 # id / 사유 / 원본 메시지 id / payload
   python dlq_tool.py replay <id|all>      # 원본 스트림에 새 메시지로 재투입(전달 횟수 0부터) 후 DLQ에서 제거
   python dlq_tool.py purge  <id|all>      # 재투입 없이 제거
-env: REDIS_HOST, REDIS_PORT, REDIS_PASSWORD (워커와 동일)
+env: REDIS_MODE 등 redis_conn.py와 동일 (워커와 같은 값)
 """
 import os
 import sys
@@ -17,8 +17,9 @@ import redis
 STREAM_KEY = "nonverbal-analysis-jobs"
 DLQ_STREAM_KEY = "nonverbal-analysis-dlq"
 
-r = redis.Redis(host=os.getenv("REDIS_HOST", "127.0.0.1"), port=int(os.getenv("REDIS_PORT", 6379)),
-                password=os.getenv("REDIS_PASSWORD"), decode_responses=True)
+from redis_conn import make_redis  # noqa: E402
+
+r = make_redis(decode_responses=True)
 
 
 def select(sel):

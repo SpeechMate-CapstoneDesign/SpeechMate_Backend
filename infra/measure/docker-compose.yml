@@ -1,0 +1,114 @@
+# @Async vs Redis Streams 측정 스택 — 운영 compose(Spring + MySQL + Redis + ai-worker)와 같은 구성에서
+# 비밀(.env/S3)만 뺀 것: 앱은 test 프로파일(외부 서비스 더미), 워커 분석은 ANALYSIS_SLEEP초 stub.
+# APP=streams(dev jar) | async(experiment/async-http jar). 모니터링은 infra/conf 의 Grafana 대시보드를 그대로 쓴다.
+name: smate-measure
+
+services:
+  db:
+    image: mysql:8.0
+    environment: { MYSQL_ROOT_PASSWORD: m1234, MYSQL_DATABASE: speechmate }
+    command: --default-time-zone=+09:00 --cte-max-recursion-depth=5000
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h127.0.0.1 -uroot -pm1234 --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--requirepass", "redis1234", "--appendonly", "yes", "--maxmemory", "1gb", "--maxmemory-policy", "noeviction"]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a redis1234 --no-auth-warning ping | grep PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    image: amazoncorretto:17-alpine
+    command: ["java", "-jar", "/app.jar"]
+    volumes:
+      - ./jars/app-${APP:-streams}.jar:/app.jar:ro
+      - ./seed.sql:/seed.sql:ro
+    ports: ["18080:8080"]
+    restart: always            # 운영과 같음 — docker kill 뒤 스스로 올라온다
+    environment:
+      SPRING_PROFILES_ACTIVE: test
+      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/speechmate?serverTimezone=Asia/Seoul
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: com.mysql.cj.jdbc.Driver
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: m1234
+      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: org.hibernate.dialect.MySQLDialect
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update        # 재시작해도 상태 행이 남아야 유실을 셀 수 있다
+      SPRING_JPA_DEFER_DATASOURCE_INITIALIZATION: "true"
+      SPRING_SQL_INIT_MODE: always
+      SPRING_SQL_INIT_DATA_LOCATIONS: file:/seed.sql
+      SPRING_JPA_SHOW_SQL: "false"
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PASSWORD: redis1234
+      SPRING_DATA_REDIS_TIMEOUT: 2s
+      SPRING_JWT_SECRET: measure-jwt-secret-at-least-32-bytes-long
+      FIREBASE_KEY: ""
+      # test 프로파일에 없는 외부 서비스 값. 빈 생성만 통과하면 되고 실제 호출은 없다
+      CLOUD_AWS_CREDENTIALS_ACCESS_KEY: dummy
+      CLOUD_AWS_CREDENTIALS_SECRET_KEY: dummy
+      CLOUD_AWS_REGION_STATIC: ap-northeast-2
+      CLOUD_AWS_S3_BUCKET: measure-bucket
+      CLOUD_GCP_GCS_BUCKET_NAME: measure-bucket
+      OAUTH_KAKAO_APP_KEY: dummy
+      OAUTH_KAKAO_BASE_URL: https://kauth.kakao.com
+      OAUTH_KAKAO_REDIRECT_URI: http://localhost
+      LOGGING_LEVEL_COM_EXAMPLE: info
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,prometheus
+      SERVER_TOMCAT_MBEANREGISTRY_ENABLED: "true"
+      AI_WORKER_URL: http://worker:8000             # async 전용. compose DNS가 replicas 사이를 라운드로빈
+      SPRING_TASK_EXECUTION_POOL_CORE_SIZE: ${POOL_CORE:-8}
+      SPRING_TASK_EXECUTION_POOL_MAX_SIZE: ${POOL_MAX:-2147483647}
+      SPRING_TASK_EXECUTION_POOL_QUEUE_CAPACITY: ${POOL_QUEUE:-2147483647}
+      TZ: Asia/Seoul
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: infra/measure/worker.Dockerfile
+    deploy:
+      replicas: ${WORKERS:-2}
+    restart: always
+    stop_grace_period: 40s
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: redis1234
+      SPRING_CALLBACK_URL: http://app:8080/api/callback/speech/non-verbal
+      CALLBACK_SECRET: test-callback-secret
+      RECLAIM_IDLE_MS: 30000                        # 운영 10분 → 측정에선 30초
+      ANALYSIS_SLEEP: ${ANALYSIS_SLEEP:-20}
+      SHUTDOWN_GRACE_S: 30
+    depends_on:
+      redis: { condition: service_healthy }
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes: ["./prometheus.yml:/etc/prometheus/prometheus.yml:ro"]
+    ports: ["19090:9090"]
+
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    environment:
+      REDIS_ADDR: redis://redis:6379
+      REDIS_PASSWORD: redis1234
+      REDIS_EXPORTER_CHECK_SINGLE_STREAMS: nonverbal-analysis-jobs,nonverbal-analysis-dlq
+
+  grafana:
+    image: grafana/grafana:latest
+    ports: ["13000:3000"]
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+    volumes:
+      - ../conf/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ../conf/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ../conf/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on: [prometheus]

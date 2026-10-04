@@ -1,0 +1,352 @@
+{
+  "uid": "spring-nonverbal-async-vs-streams",
+  "title": "비언어 분석 - Spring 쪽 영향 (@Async vs Streams)",
+  "description": "같은 투입(버스트·Spring kill)을 experiment/async-http 브랜치와 dev(Streams)에서 각각 돌려 이 화면을 비교한다. 06-async-vs-streams.md",
+  "tags": [
+    "speechmate",
+    "nonverbal"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "nonverbal 요청 처리 시간 (avg / max)",
+      "description": "요청 스레드가 얼마나 묶이나. 둘 다 202가 목표. A안은 Python 호출이 executor로 빠지므로 여기선 차이가 없어야 하고, 차이가 나면 executor 거부 등이 요청 스레드로 새는 것",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-monitoring"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(http_server_requests_seconds_sum{uri=\"/api/speech/nonverbal/{speechId}\"}[1m])) / sum(rate(http_server_requests_seconds_count{uri=\"/api/speech/nonverbal/{speechId}\"}[1m]))",
+          "legendFormat": "avg"
+        },
+        {
+          "refId": "B",
+          "expr": "max(http_server_requests_seconds_max{uri=\"/api/speech/nonverbal/{speechId}\"})",
+          "legendFormat": "max"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "nonverbal 요청 수/초 (status별)",
+      "description": "버스트 투입 확인용. 5xx가 보이면 A안 executor 거부(TaskRejectedException) 또는 발행 실패",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-monitoring"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(http_server_requests_seconds_count{uri=\"/api/speech/nonverbal/{speechId}\"}[1m])) by (status)",
+          "legendFormat": "{{status}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "톰캣 busy 스레드",
+      "description": "요청 처리 중인 스레드. Python이 느려져도 여기가 안 올라가야 '격리'된 것",
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-monitoring"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "tomcat_threads_busy_threads",
+          "legendFormat": "busy"
+        },
+        {
+          "refId": "B",
+          "expr": "tomcat_threads_config_max_threads",
+          "legendFormat": "max"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "applicationTaskExecutor 활성 / 큐 대기",
+      "description": "A안: 활성 = Python을 붙잡고 있는 스레드(core 8 상한), 큐 = JVM 메모리에만 있는 작업(Spring 죽으면 전부 유실). B안: XADD 순간만 올라가고 0이어야 정상",
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-monitoring"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "executor_active_threads{name=\"applicationTaskExecutor\"}",
+          "legendFormat": "active"
+        },
+        {
+          "refId": "B",
+          "expr": "executor_queued_tasks{name=\"applicationTaskExecutor\"}",
+          "legendFormat": "queued"
+        },
+        {
+          "refId": "C",
+          "expr": "executor_pool_size_threads{name=\"applicationTaskExecutor\"}",
+          "legendFormat": "pool size"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "HikariCP 커넥션 active / pending",
+      "description": "pending > 0 이면 풀 고갈. Redis·Python 지연이 DB 커넥션으로 전염되는지",
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-monitoring"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "hikaricp_connections_active",
+          "legendFormat": "active"
+        },
+        {
+          "refId": "B",
+          "expr": "hikaricp_connections_pending",
+          "legendFormat": "pending"
+        },
+        {
+          "refId": "C",
+          "expr": "hikaricp_connections_max",
+          "legendFormat": "max"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "JVM heap 사용량",
+      "description": "A안 무제한 큐가 메모리로 밀리는지",
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-monitoring"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(jvm_memory_used_bytes{area=\"heap\"})",
+          "legendFormat": "heap used"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(jvm_memory_max_bytes{area=\"heap\"})",
+          "legendFormat": "heap max"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "[B] 스트림 lag / pending (비교용)",
+      "description": "Streams에선 큐가 Redis에 있다 — 같은 버스트에서 위 executor 큐 대신 여기가 올라가야 한다",
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-monitoring"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(redis_stream_group_lag{stream=\"nonverbal-analysis-jobs\",group=\"analysis-group\"})",
+          "legendFormat": "lag (미전달)"
+        },
+        {
+          "refId": "B",
+          "expr": "max(redis_stream_group_messages_pending{stream=\"nonverbal-analysis-jobs\",group=\"analysis-group\"})",
+          "legendFormat": "pending (처리 중)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    }
+  ],
+  "templating": {
+    "list": []
+  }
+}

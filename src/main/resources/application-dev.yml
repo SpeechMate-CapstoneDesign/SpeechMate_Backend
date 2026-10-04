@@ -55,6 +55,11 @@ oauth:
     base-url: https://kauth.kakao.com
     app-key: ${KAKAO_APP_KEY}
 
+server:
+  tomcat:
+    mbeanregistry:
+      enabled: true   # tomcat_threads_* 메트릭 (Grafana "Spring 쪽 영향" 대시보드)에 필요
+
 management:
   endpoints:
     web:

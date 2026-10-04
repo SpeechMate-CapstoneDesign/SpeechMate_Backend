@@ -43,7 +43,8 @@ public class SpeechCallbackController {
 
         speechCallbackService.saveNonVerbalResult(
                 callbackRequest.getSpeechId(),
-                callbackRequest.getResponse()
+                callbackRequest.getResponse(),
+                callbackRequest.getJobToken()
         );
         return ResponseEntity.ok().build();
     }

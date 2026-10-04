@@ -57,7 +57,7 @@ class SpeechCallbackControllerTest {
         mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content(BODY)
                         .header("X-Callback-Secret", "wrong"))
                 .andExpect(status().isUnauthorized());
-        verify(speechCallbackService, never()).saveNonVerbalResult(any(), any());
+        verify(speechCallbackService, never()).saveNonVerbalResult(any(), any(), any());
     }
 
     @Test
@@ -66,6 +66,6 @@ class SpeechCallbackControllerTest {
         mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content(BODY)
                         .header("X-Callback-Secret", "test-callback-secret"))
                 .andExpect(status().isOk());
-        verify(speechCallbackService).saveNonVerbalResult(eq(7L), any());
+        verify(speechCallbackService).saveNonVerbalResult(eq(7L), any(), any());
     }
 }

@@ -66,6 +66,10 @@ public class Speech extends BaseEntity {
     @Column(nullable = false)
     private AnalysisStatus nonVerbalStatus = AnalysisStatus.NOT_STARTED;
 
+    // 현재 진행 중인 비언어 분석 시도의 식별자. at-least-once 큐라 같은 speechId의 콜백이 늦게/두 번 올 수 있어
+    // 콜백이 "지금 시도"의 것인지 이 값으로 판별한다 (다르면 무시).
+    private String nonVerbalJobToken;
+
 
     public void setFileUrl(String fileUrl) {
         this.FileUrl = fileUrl;
@@ -110,5 +114,9 @@ public class Speech extends BaseEntity {
     // 상태 변경을 위한 Setter
     public void setNonVerbalStatus(AnalysisStatus nonVerbalStatus) {
         this.nonVerbalStatus = nonVerbalStatus;
+    }
+
+    public void setNonVerbalJobToken(String nonVerbalJobToken) {
+        this.nonVerbalJobToken = nonVerbalJobToken;
     }
 }

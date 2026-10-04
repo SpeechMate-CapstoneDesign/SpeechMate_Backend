@@ -2,7 +2,7 @@ spring:
   # H2 데이터베이스 설정
   datasource:
     # jdbc:h2:mem:testdb -> 'testdb'라는 이름의 인메모리 DB를 사용하겠다는 의미
-    url: jdbc:h2:mem:testdb
+    url: jdbc:h2:mem:testdb;NON_KEYWORDS=USER   # user가 H2 2.x 예약어라 테이블 생성이 실패함
     driver-class-name: org.h2.Driver
     username: sa # H2 기본 username
     password:   # H2 기본 password는 비어있음

@@ -66,8 +66,8 @@ public class SpeechTest {
     @Autowired
     private RedisConnectionFactory redisConnectionFactory;
 
-    // 추가 MockBean: SpeechService의 다른 의존성들
-    @MockBean
+    // user 테이블은 실제로 만든다 (speech.user_id FK가 걸려 있어 유저 행이 있어야 speech를 저장할 수 있음)
+    @Autowired
     private UserRepository userRepository;
 
     @MockBean
@@ -101,14 +101,14 @@ public class SpeechTest {
     @BeforeEach
     void setUp() {
         speechRepository.deleteAll();
+        userRepository.deleteAll();
         OauthInfo oauthInfo = new OauthInfo(); // 실제 OauthInfo 객체
         speech = new Speech();         // 실제 Speech 객체
 
 // 2. User 객체를 먼저 생성합니다. (skills는 아직 비어있음)
-        User user = User.builder()
-                .id(1L)
+        User user = userRepository.save(User.builder()
                 .oauthInfo(oauthInfo)
-                .build();
+                .build());
 
 // 3. 생성된 user 객체를 참조하여 UserSkill 객체들을 생성합니다.
         UserSkill skill1 = new UserSkill(user, SkillType.APPROPRIATE_PACE);
@@ -121,8 +121,6 @@ public class SpeechTest {
         user.addSpeech(speech);
         speech.setUser(user);
         speech = speechRepository.save(speech);
-        // Mock 설정: 필요 시 추가 (예: userRepository가 호출되면 null 반환 등)
-        when(userRepository.findById(anyLong())).thenReturn(Optional.empty());  // 예시
     }
 
     @Test
@@ -228,7 +226,7 @@ public class SpeechTest {
 
     @Test
     @DisplayName("비언어 분석 요청은 트랜잭션 커밋 후에만 Stream에 발행된다 (롤백 시 유령 작업 없음)")
-    void nonverbal_job_is_published_only_after_commit() {
+    void nonverbal_job_is_published_only_after_commit() throws Exception {
         // SpeechService는 @MockBean이 아닌 실제 RedisTemplate<String,String>을 쓰므로 실제 Stream을 검증한다
         String streamKey = "nonverbal-analysis-jobs";
         StringRedisTemplate redis = new StringRedisTemplate(redisConnectionFactory);
@@ -244,9 +242,14 @@ public class SpeechTest {
             assertThat(speechRepository.findById(speech.getId()).get().getNonVerbalStatus())
                     .isEqualTo(AnalysisStatus.NOT_STARTED);
 
-            // 커밋: 정확히 1건 발행(speechId + s3Key 포함)되고 상태는 IN_PROGRESS
+            // 커밋: 정확히 1건 발행(speechId + s3Key 포함)되고 상태는 IN_PROGRESS.
+            // 발행은 커밋 뒤 executor 스레드에서 하므로(NonVerbalJobPublisher) 잠깐 기다린다
             speechService.requestNonVerbalAnalysis(speech.getId());
-            List<MapRecord<String, Object, Object>> records = redis.opsForStream().range(streamKey, Range.unbounded());
+            List<MapRecord<String, Object, Object>> records = List.of();
+            for (int i = 0; i < 50 && records.isEmpty(); i++) {
+                Thread.sleep(100);
+                records = redis.opsForStream().range(streamKey, Range.unbounded());
+            }
             assertThat(records).hasSize(1);
             assertThat((String) records.get(0).getValue().get("job"))
                     .contains("\"speechId\":" + speech.getId())

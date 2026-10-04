@@ -30,17 +30,16 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 
@@ -58,12 +57,8 @@ public class SpeechService {
     private final ReturnZeroClient returnZeroClient;
     private final RedisUtil redisUtil;
     private final ObjectMapper objectMapper;
-    private final RedisTemplate<String, String> redisTemplate;
+    private final ApplicationEventPublisher eventPublisher;
     private final PendingUploadRepository pendingUploadRepository;
-
-    // Redis Stream에 사용할 작업 큐 이름 (상수)
-    private static final String STREAM_KEY = "nonverbal-analysis-jobs";
-    private static final int MAX_STREAM_LENGTH = 10000;
 
     @Value("${spring.ai.openai.api-key}")
     private String openAiApiKey;
@@ -630,39 +625,30 @@ public AnalysisResultDto getSpeechContentAnalysisById(Long speechId) {
 
         // 3. Redis Stream에 보낼 메시지(Job) 생성
         // (Python이 speechId와 s3Key를 모두 알아야 함)
-        NonVerbalAnalysisRequest requestDto = new NonVerbalAnalysisRequest(speechId, s3Key);
+        String jobToken = UUID.randomUUID().toString();
+        NonVerbalAnalysisRequest requestDto = new NonVerbalAnalysisRequest(speechId, s3Key, jobToken);
 
         try {
-            // 4. [핵심 수정] Streams에 작업(Job)을 추가 (XADD)
-            // Python이 작업을 JSON으로 쉽게 파싱할 수 있도록 body 필드 하나에 직렬화
+            // 4. Streams에 넣을 작업(Job). Python이 JSON으로 쉽게 파싱하도록 body 필드 하나에 직렬화
             String messageBody = objectMapper.writeValueAsString(requestDto);
             Map<String, String> jobData = Collections.singletonMap("job", messageBody);
 
-            // XADD는 트랜잭션 커밋 후에 실행 — 롤백 시 DB에 없는 작업이 스트림에만 남는 것을 방지.
-            // 커밋 후 XADD가 실패하면 상태는 IN_PROGRESS로 남지만,
-            // NonVerbalAnalysisTimeoutScheduler가 FAILED로 전환하고 FAILED는 재요청 가능하므로 자가 복구됨.
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    redisTemplate.opsForStream().add(STREAM_KEY, jobData);
-                    redisTemplate.opsForStream().trim(STREAM_KEY, MAX_STREAM_LENGTH, true); // approximate trim(~)
-                }
-            });
+            // XADD는 커밋 뒤, 요청 스레드 밖에서 한다 (NonVerbalJobPublisher). 롤백되면 이벤트가 버려져 유령 작업이 안 남고,
+            // Redis가 느릴 때 이 요청이 DB 커넥션을 쥔 채 기다리지 않는다. 발행 실패는 publisher가 FAILED로 돌린다.
+            eventPublisher.publishEvent(new NonVerbalJobPublisher.JobRequested(speechId, jobToken, jobData));
 
             // 5. [핵심] 상태를 'IN_PROGRESS' (분석 중)으로 변경
             speech.setNonVerbalStatus(AnalysisStatus.IN_PROGRESS);
+            speech.setNonVerbalJobToken(jobToken); // 이전 시도의 늦은 콜백은 토큰 불일치로 무시됨
             speechRepository.save(speech); // 상태 변경 저장
 
-            log.info("비언어적 분석 작업 Stream 발행 (Speech ID: {}). 상태: IN_PROGRESS", speechId);
+            log.info("비언어적 분석 작업 발행 예약 (Speech ID: {}). 상태: IN_PROGRESS", speechId);
 
             return NonVerbalAnalysisGateResponse.statusOnly(AnalysisStatus.IN_PROGRESS);
 
         } catch (JsonProcessingException e) {
             log.error("Redis Stream 작업 직렬화 실패 (Speech ID: {}): {}", speechId, e.getMessage(), e);
             throw new RuntimeException("작업 생성 중 오류가 발생했습니다.", e);
-        } catch (Exception e) {
-            log.error("Redis Stream 발행 실패 (Speech ID: {}): {}", speechId, e.getMessage(), e);
-            throw new RuntimeException("작업 발행 중 오류가 발생했습니다.", e);
         }
     }
 }

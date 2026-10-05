@@ -2,7 +2,11 @@ package com.example.speechmate_backend.speech.service;
 
 import com.example.speechmate_backend.common.exception.*;
 import com.example.speechmate_backend.s3.service.S3UploadPresignedUrlService;
-import com.example.speechmate_backend.speech.controller.dto.TranscriptionResponse;
+import com.example.speechmate_backend.speech.AnalysisStatus;
+import com.example.speechmate_backend.speech.controller.dto.SentenceDto;
+import com.example.speechmate_backend.speech.controller.dto.SttGateResponse;
+import com.example.speechmate_backend.speech.domain.VerbalAnalysisResult;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.example.speechmate_backend.speech.domain.Speech;
 import com.example.speechmate_backend.speech.repository.SpeechRepository;
 import com.example.speechmate_backend.speech.returnzero.ReturnZeroClient;
@@ -13,6 +17,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -22,6 +27,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.util.List;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -67,29 +73,51 @@ class SpeechServiceExceptionTest {
     }
 
     @Test
-    @DisplayName("rtzrStt: 파일 용량 초과(400)는 500으로 바뀌지 않고 그대로 나간다")
-    void stt_passes_file_too_large() {
-        when(returnZeroClient.rtzrSttFromS3("a.mp3")).thenThrow(FileTooLargeException.EXCEPTION);
-        assertThatThrownBy(() -> speechService.rtzrStt(1L, 1L)).isSameAs(FileTooLargeException.EXCEPTION);
+    @DisplayName("STT 접수: 파일키가 없으면 404이고 아무것도 접수되지 않는다")
+    void stt_gate_rejects_missing_file_key() {
+        speech.setFileUrl(null);
+        assertThatThrownBy(() -> speechService.rtzrStt(1L, 1L)).isSameAs(SpeechFileKeyNotFoundException.EXCEPTION);
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
 
     @Test
-    @DisplayName("rtzrStt: 네트워크 등 예상 못 한 예외는 ReturnZeroException으로")
-    void stt_wraps_unexpected() {
-        when(returnZeroClient.rtzrSttFromS3("a.mp3")).thenThrow(new RuntimeException("timeout"));
-        assertThatThrownBy(() -> speechService.rtzrStt(1L, 1L)).isInstanceOf(ReturnZeroException.class);
+    @DisplayName("STT 접수: 처음이면 IN_PROGRESS로 바꾸고 커밋 뒤 실행될 작업 이벤트를 1건 발행한다")
+    void stt_gate_accepts_and_publishes() {
+        SttGateResponse res = speechService.rtzrStt(1L, 1L);
+
+        assertThat(res.sttStatus()).isEqualTo(AnalysisStatus.IN_PROGRESS);
+        assertThat(speech.getSttStatus()).isEqualTo(AnalysisStatus.IN_PROGRESS);
+        assertThat(speech.getSttJobToken()).isNotBlank();
+        ArgumentCaptor<Object> ev = ArgumentCaptor.forClass(Object.class);
+        verify(eventPublisher).publishEvent(ev.capture());
+        assertThat(ev.getValue()).isEqualTo(new SttJobRunner.JobRequested(1L, speech.getSttJobToken()));
     }
 
     @Test
-    @DisplayName("rtzrStt: 분석 뒤에도 VerbalAnalysisResult가 없으면 ReturnZeroException")
-    void stt_fails_when_analysis_result_missing() throws Exception {
-        when(returnZeroClient.rtzrSttFromS3("a.mp3")).thenReturn("rid");
-        when(returnZeroClient.rtzrTranscription("rid")).thenReturn(
-                new TranscriptionResponse("rid", "completed", new TranscriptionResponse.Results(List.of(), true)));
-        when(objectMapper.writeValueAsString(any())).thenReturn("{}");
-        // verbalanalyze(mock)가 결과 엔티티를 붙이지 않음
+    @DisplayName("STT 접수: 진행 중이면 상태만 돌려주고 다시 접수하지 않는다. FAILED면 다시 접수한다")
+    void stt_gate_in_progress_and_failed() {
+        speech.setSttStatus(AnalysisStatus.IN_PROGRESS);
+        assertThat(speechService.rtzrStt(1L, 1L).sttStatus()).isEqualTo(AnalysisStatus.IN_PROGRESS);
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
 
-        assertThatThrownBy(() -> speechService.rtzrStt(1L, 1L)).isInstanceOf(ReturnZeroException.class);
+        speech.setSttStatus(AnalysisStatus.FAILED);
+        assertThat(speechService.rtzrStt(1L, 1L).sttStatus()).isEqualTo(AnalysisStatus.IN_PROGRESS);
+        verify(eventPublisher, times(1)).publishEvent(any(Object.class));
+    }
+
+    @Test
+    @DisplayName("STT 접수: 이미 문장이 저장돼 있으면 COMPLETED와 문장을 바로 돌려준다 (상태 컬럼 도입 전 데이터 포함)")
+    void stt_gate_returns_cached_sentences() throws Exception {
+        VerbalAnalysisResult verbal = new VerbalAnalysisResult();
+        verbal.setSentencesJson("[{\"startTime\":0,\"sentence\":\"안녕\"}]");
+        speech.setVerbalAnalysisResult(verbal);
+        when(objectMapper.readValue(anyString(), any(TypeReference.class))).thenReturn(List.of(new SentenceDto(0, "안녕")));
+
+        SttGateResponse res = speechService.rtzrStt(1L, 1L);
+
+        assertThat(res.sttStatus()).isEqualTo(AnalysisStatus.COMPLETED);
+        assertThat(res.sentences()).containsExactly(new SentenceDto(0, "안녕"));
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
 
     @Test
@@ -98,7 +126,7 @@ class SpeechServiceExceptionTest {
         when(objectMapper.writeValueAsString(any())).thenThrow(new JsonProcessingException("x") {});
 
         assertThatThrownBy(() -> speechService.requestNonVerbalAnalysis(1L, 1L)).isInstanceOf(NonVerbalAnalysisException.class);
-        verify(eventPublisher, never()).publishEvent(any());
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
         verify(speechRepository, never()).save(any());
     }
 }

@@ -22,4 +22,6 @@ public interface SpeechRepository extends JpaRepository<Speech, Long> {
 
     List<Speech> findByNonVerbalStatusAndModifiedAtBefore(AnalysisStatus status, LocalDateTime cutoff);
 
+    List<Speech> findBySttStatusAndModifiedAtBefore(AnalysisStatus status, LocalDateTime cutoff);
+
 }

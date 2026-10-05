@@ -122,11 +122,12 @@ public class SpeechTest {
     }
 
     @Test
-    @DisplayName("rtzrStt 동시 요청 10건에도 분산 락 덕분에 외부 STT API는 1번만 호출된다")
-    void rtzrStt_should_call_api_only_once_with_distributed_lock() throws InterruptedException {
-        // given: 외부 STT 호출은 100ms 걸리는 가짜. 분석 서비스(mock)는 결과 엔티티만 붙여 준다
+    @DisplayName("STT 접수: 동시 요청 10건이어도 작업은 1번만 돌고, 요청 스레드는 외부 STT가 끝나길 기다리지 않는다")
+    void stt_is_accepted_once_and_request_does_not_wait() throws Exception {
+        // given: 외부 STT는 2초 걸리는 가짜. 분석 서비스(mock)는 결과 엔티티만 붙여 준다
+        long sttMillis = 2000;
         when(returnZeroClient.rtzrSttFromS3(anyString())).thenAnswer(inv -> {
-            Thread.sleep(100);
+            Thread.sleep(sttMillis);
             return "rtzr-id";
         });
         when(returnZeroClient.rtzrTranscription("rtzr-id"))
@@ -142,15 +143,19 @@ public class SpeechTest {
         ExecutorService executorService = Executors.newFixedThreadPool(threadCount);
         CountDownLatch latch = new CountDownLatch(threadCount);
         Long userId = speech.getUser().getId();
+        List<Long> elapsed = java.util.Collections.synchronizedList(new java.util.ArrayList<>());
+        List<AnalysisStatus> statuses = java.util.Collections.synchronizedList(new java.util.ArrayList<>());
 
         // when
         for (int i = 0; i < threadCount; i++) {
             executorService.submit(() -> {
+                long t0 = System.nanoTime();
                 try {
-                    speechService.rtzrStt(speech.getId(), userId);
+                    statuses.add(speechService.rtzrStt(speech.getId(), userId).sttStatus());
                 } catch (Exception e) {
-                    // 락 대기 초과 등은 무시. 검증 대상은 외부 API 호출 횟수
+                    // 락 대기 초과 등은 무시
                 } finally {
+                    elapsed.add((System.nanoTime() - t0) / 1_000_000);
                     latch.countDown();
                 }
             });
@@ -158,9 +163,25 @@ public class SpeechTest {
         latch.await();
         executorService.shutdown();
 
-        // then: 첫 스레드가 커밋한 rawTranscription을 뒤 스레드들이 캐시로 읽어 API를 다시 부르지 않는다
+        // then 1: 요청은 전부 IN_PROGRESS로 즉시 돌아온다. 외부 STT(2초)를 기다린 요청이 없다
+        assertThat(statuses).isNotEmpty().allMatch(st -> st == AnalysisStatus.IN_PROGRESS);
+        assertThat(elapsed).allMatch(ms -> ms < sttMillis);
+        System.out.printf("[측정] STT 접수 요청 지연: max=%dms, 외부 STT=%dms%n", elapsed.stream().mapToLong(Long::longValue).max().orElse(-1), sttMillis);
+
+        // then 2: 백그라운드에서 1번만 돌고 COMPLETED가 된다
+        Speech done = null;
+        for (int i = 0; i < 100; i++) {
+            Thread.sleep(100);
+            done = speechRepository.findById(speech.getId()).get();
+            if (done.getSttStatus() == AnalysisStatus.COMPLETED) break;
+        }
+        assertThat(done.getSttStatus()).isEqualTo(AnalysisStatus.COMPLETED);
+        assertThat(done.getRawTranscription()).contains("rtzr-id");
         verify(returnZeroClient, times(1)).rtzrSttFromS3(anyString());
-        assertThat(speechRepository.findById(speech.getId()).get().getRawTranscription()).contains("rtzr-id");
+
+        // then 3: 완료 뒤 같은 요청은 저장된 문장을 바로 돌려주고 외부 API는 다시 부르지 않는다
+        assertThat(speechService.rtzrStt(speech.getId(), userId).sttStatus()).isEqualTo(AnalysisStatus.COMPLETED);
+        verify(returnZeroClient, times(1)).rtzrSttFromS3(anyString());
     }
 
     @Test

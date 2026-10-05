@@ -4,6 +4,7 @@ import com.amazonaws.services.s3.model.S3Object;
 import com.example.speechmate_backend.common.exception.FFmpegException;
 import com.example.speechmate_backend.common.exception.FileTooLargeException;
 import com.example.speechmate_backend.common.exception.ReturnZeroException;
+import com.example.speechmate_backend.common.exception.SmateException;
 import com.example.speechmate_backend.s3.service.S3UploadPresignedUrlService;
 import com.example.speechmate_backend.speech.controller.dto.TranscriptionResponse;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -60,7 +61,7 @@ public class ReturnZeroClient {
 
             // 1. 임시 파일로 저장
             String fileExtension = getFileExtension(fileKey);
-            tempVideoFile = File.createTempFile("speech-temp", "." + fileExtension);
+            tempVideoFile = Files.createTempFile("speech-temp", "." + fileExtension).toFile(); // 소유자만 접근 가능한 권한으로 생성
 
             try (InputStream is = s3Object.getObjectContent()) {
                 Files.copy(is, tempVideoFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
@@ -73,13 +74,13 @@ public class ReturnZeroClient {
                     || "mov".equalsIgnoreCase(fileExtension)
                     || "m4a".equalsIgnoreCase(fileExtension)) {
 
-                tempAudioFile = File.createTempFile("audio-extracted", ".mp3");
+                tempAudioFile = Files.createTempFile("audio-extracted", ".mp3").toFile();
                 log.info("ffmpeg 변환 시작");
                 runFfmpegConversion(tempVideoFile, tempAudioFile);
                 log.info("변환 완료. MP3 크기: {} bytes", tempAudioFile.length());
 
             } else {
-                tempAudioFile = File.createTempFile("audio-original", "." + fileExtension);
+                tempAudioFile = Files.createTempFile("audio-original", "." + fileExtension).toFile();
                 Files.copy(tempVideoFile.toPath(), tempAudioFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
             }
 
@@ -124,6 +125,8 @@ public class ReturnZeroClient {
 
             log.info("ReturnZero에서 받은 응답(Id): {}", rtzrId);
             return rtzrId;
+        } catch (SmateException e) {
+            throw e; // 파일 용량 초과(400), ffmpeg 실패 등은 자기 코드 그대로
         } catch (Exception e) {
             log.error("ReturnZero Id를 받아오는 중에 오류 발생", e);
             throw ReturnZeroException.EXCEPTION;

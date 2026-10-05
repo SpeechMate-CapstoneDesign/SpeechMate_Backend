@@ -1,6 +1,7 @@
 package com.example.speechmate_backend.common.exception;
 
 import com.example.speechmate_backend.common.ApiResponse;
+import com.example.speechmate_backend.common.error.ErrorCode;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.client.RedisException;
 import org.springframework.data.redis.RedisConnectionFailureException;
@@ -67,6 +68,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     public ResponseEntity<ApiResponse<String>> handleSmateException(SmateException ex) {
         return ResponseEntity.status(ex.getError().getResultCode())
                 .body(ApiResponse.fail(ex.getError()));
+    }
+
+    /** 위 어디에도 안 걸린 예외. 스택은 서버 로그에만 남기고 클라이언트엔 같은 봉투의 500만 준다. */
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ApiResponse<String>> handleUnexpected(Exception ex) {
+        log.error("처리되지 않은 예외", ex);
+        return ResponseEntity.status(ErrorCode.INTERNAL_SERVER_ERROR.getResultCode())
+                .body(ApiResponse.fail(ErrorCode.INTERNAL_SERVER_ERROR));
     }
 
     /**

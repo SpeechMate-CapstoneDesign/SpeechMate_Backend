@@ -25,7 +25,7 @@ spring:
     # 실행되는 SQL 쿼리를 로그로 보고 싶을 때 활성화
     show-sql: true
   jwt:
-    secret: test-secret-key  # JwtUtil 실패 방지
+    secret: test-secret-key-must-be-at-least-32-bytes-for-hs256  # HS256 키 최소 256bit
     expiration: 3600000
 
 returnzero:
@@ -52,4 +52,4 @@ callback:
   secret: test-callback-secret
 
 ffmpeg:
-  path: /usr/bin/ffmpeg   # SpeechRestClient 빈 생성용 (테스트에서 실제 호출 없음)
+  path: /usr/bin/ffmpeg   # ReturnZeroClient 빈 생성용 (테스트에서 실제 호출 없음)

@@ -44,7 +44,7 @@ public class SpeechCustomRepositoryImpl implements SpeechCustomRepository{
                 .where(
                         speech.user.id.eq(userId),
                         // 커서 기반 조건 추가
-                        createPagingCondition(lastSpeechId, sortType)
+                        createPagingCondition(lastSpeechId, actualSortType)
                 )
                 .limit(limit);
 

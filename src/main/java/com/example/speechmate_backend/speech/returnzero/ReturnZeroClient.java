@@ -151,21 +151,6 @@ public class ReturnZeroClient {
 
     }
 
-    //test용
-    public String testrtzrTranscription(String rtzrid) {
-        String accessToken = returnZeroTokenManager.getAccessToken();
-
-        String response = webClient.get()
-                .uri("/v1/transcribe/{rtzrid}", rtzrid)
-                .header("Authorization", "Bearer " + accessToken)
-                .retrieve()
-                .bodyToMono(String.class) // ✅ DTO로 변환
-                .block();
-
-        return response;
-    }
-
-
     // ffmpeg 로컬 파일 변환
     private void runFfmpegConversion(File inputFile, File outputFile) throws Exception {
         ProcessBuilder pb = new ProcessBuilder(

@@ -5,7 +5,8 @@ import com.example.speechmate_backend.config.redis.RedisUtil;
 import com.example.speechmate_backend.fcm.FirebaseConfig;
 import com.example.speechmate_backend.s3.config.S3Config;
 import com.example.speechmate_backend.s3.service.S3UploadPresignedUrlService;
-import com.example.speechmate_backend.speech.controller.SpeechRestClient;
+import com.example.speechmate_backend.speech.controller.dto.TranscriptionResponse;
+import com.example.speechmate_backend.speech.domain.VerbalAnalysisResult;
 import com.example.speechmate_backend.speech.domain.Speech;
 import com.example.speechmate_backend.speech.repository.SpeechCustomRepository;
 import com.example.speechmate_backend.speech.repository.SpeechRepository;
@@ -41,6 +42,7 @@ import java.util.concurrent.Executors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
@@ -52,10 +54,6 @@ public class SpeechTest {
 
     @Autowired
     private SpeechRepository speechRepository;
-
-    // 기존 MockBean
-    @MockBean
-    private SpeechRestClient speechRestClient;
 
     @Autowired
     private RedisUtil redisUtil;
@@ -124,96 +122,53 @@ public class SpeechTest {
     }
 
     @Test
-    @DisplayName("transcribe 메소드에 동시 요청이 발생해도 분산 락을 적용한 외부 API는 단 1번만 호출된다")
-    void transcribe_should_call_api_only_once_with_distributed_lock() throws InterruptedException {
-        // given
+    @DisplayName("rtzrStt 동시 요청 10건에도 분산 락 덕분에 외부 STT API는 1번만 호출된다")
+    void rtzrStt_should_call_api_only_once_with_distributed_lock() throws InterruptedException {
+        // given: 외부 STT 호출은 100ms 걸리는 가짜. 분석 서비스(mock)는 결과 엔티티만 붙여 준다
+        when(returnZeroClient.rtzrSttFromS3(anyString())).thenAnswer(inv -> {
+            Thread.sleep(100);
+            return "rtzr-id";
+        });
+        when(returnZeroClient.rtzrTranscription("rtzr-id"))
+                .thenReturn(new TranscriptionResponse("rtzr-id", "completed",
+                        new TranscriptionResponse.Results(List.of(), true)));
+        doAnswer(inv -> {
+            Speech s = inv.getArgument(0);
+            s.setVerbalAnalysisResult(new VerbalAnalysisResult());
+            return "";
+        }).when(speechAnalysisResultService).verbalanalyze(any(), any());
+
         int threadCount = 10;
         ExecutorService executorService = Executors.newFixedThreadPool(threadCount);
         CountDownLatch latch = new CountDownLatch(threadCount);
-
-        // 1. 호출되면 100ms 동안 지연시켜 실제 API처럼 동작하게 만듭니다.
-        // 2. "Mock STT Result" 라는 가짜 결과를 반환합니다.
-        when(speechRestClient.transcribeWithFileFromS3(anyString())).thenAnswer(invocation -> {
-            Thread.sleep(100); // 100ms 지연 시뮬레이션
-            return "Mock STT Result";
-        });
+        Long userId = speech.getUser().getId();
 
         // when
         for (int i = 0; i < threadCount; i++) {
             executorService.submit(() -> {
                 try {
-                    // 여러 스레드가 동시에 같은 speechId에 대해 STT 요청
-                    speechService.transcribeversionFromS3(speech.getId());
+                    speechService.rtzrStt(speech.getId(), userId);
                 } catch (Exception e) {
-                    // 락 획득 실패 시 IllegalStateException이 발생할 수 있으나,
-                    // 테스트의 목적은 API 호출 횟수 검증이므로 예외는 무시합니다.
+                    // 락 대기 초과 등은 무시. 검증 대상은 외부 API 호출 횟수
                 } finally {
                     latch.countDown();
                 }
             });
         }
-
-        latch.await(); // 모든 스레드가 끝날 때까지 대기
+        latch.await();
         executorService.shutdown();
 
-        // then
-        // 10개의 스레드가 경쟁했지만, 비용이 발생하는 speechRestClient의 메소드는
-        // 오직 1번만 호출되었는지 검증합니다.
-        verify(speechRestClient, times(1)).transcribeWithFileFromS3(anyString());
-
-        // 추가 검증: DB에 결과가 잘 저장되었는지 확인
-        Speech resultSpeech = speechRepository.findById(speech.getId()).get();
-        assertThat(resultSpeech.getContent()).isEqualTo("Mock STT Result");
-    }
-
-    @Test
-    @DisplayName("transcribe 메소드에 동시 요청이 발생해도 분산 락을 적용하지 않은 외부 API는 모든 스레드만큼 호출된다")
-    void transcribe_should_call_api_only_once_without_distributed_lock() throws InterruptedException {
-        // given
-        int threadCount = 10;
-        ExecutorService executorService = Executors.newFixedThreadPool(threadCount);
-        CountDownLatch latch = new CountDownLatch(threadCount);
-
-        // 가짜 RestClient 설정:
-        // 1. 호출되면 100ms 동안 지연시켜 실제 API처럼 동작하게 만듭니다.
-        // 2. "Mock STT Result" 라는 가짜 결과를 반환합니다.
-        when(speechRestClient.transcribeWithFileFromS3(anyString())).thenAnswer(invocation -> {
-            Thread.sleep(100); // 100ms 지연 시뮬레이션
-            return "Mock STT Result";
-        });
-
-        // when
-        for (int i = 0; i < threadCount; i++) {
-            executorService.submit(() -> {
-                try {
-                    // 여러 스레드가 동시에 같은 speechId에 대해 STT 요청
-                    speechService.transcribeversionFromS3WithoutLock(speech.getId());
-                } catch (Exception e) {
-                    // 락 획득 실패 시 IllegalStateException이 발생할 수 있으나,
-                    // 테스트의 목적은 API 호출 횟수 검증이므로 예외는 무시합니다.
-                } finally {
-                    latch.countDown();
-                }
-            });
-        }
-
-        latch.await(); // 모든 스레드가 끝날 때까지 대기
-        executorService.shutdown();
-
-        // then
-        // 10개의 스레드가 경쟁했지만, 비용이 발생하는 speechRestClient의 메소드는
-        // 오직 1번만 호출되었는지 검증합니다.
-        verify(speechRestClient, times(10)).transcribeWithFileFromS3(anyString());
-
-        // 추가 검증: DB에 결과가 잘 저장되었는지 확인
-        Speech resultSpeech = speechRepository.findById(speech.getId()).get();
-        assertThat(resultSpeech.getContent()).isEqualTo("Mock STT Result");
+        // then: 첫 스레드가 커밋한 rawTranscription을 뒤 스레드들이 캐시로 읽어 API를 다시 부르지 않는다
+        verify(returnZeroClient, times(1)).rtzrSttFromS3(anyString());
+        assertThat(speechRepository.findById(speech.getId()).get().getRawTranscription()).contains("rtzr-id");
     }
 
     @Test
     @DisplayName("같은 날 6번째 업로드 시도 시 UploadLimitExceededException 발생")
     void uploadLimitExceeded_after_five_requests() {
         String userId = "123";
+        // 카운터 키는 자정까지 살아 있어서, 같은 날 두 번째 실행부터는 이전 실행분이 남는다
+        new StringRedisTemplate(redisConnectionFactory).delete("upload:" + userId + ":" + java.time.LocalDate.now());
         // 5번은 통과
         for (int i = 0; i < 5; i++) {
             redisUtil.uploadlimit(userId);
@@ -234,7 +189,7 @@ public class SpeechTest {
         try {
             // 롤백: 안쪽 @Transactional은 바깥 트랜잭션에 참여하므로 바깥이 롤백되면 afterCommit이 실행되지 않아야 한다
             new TransactionTemplate(txManager).execute(status -> {
-                speechService.requestNonVerbalAnalysis(speech.getId());
+                speechService.requestNonVerbalAnalysis(speech.getId(), speech.getUser().getId());
                 status.setRollbackOnly();
                 return null;
             });
@@ -244,7 +199,7 @@ public class SpeechTest {
 
             // 커밋: 정확히 1건 발행(speechId + s3Key 포함)되고 상태는 IN_PROGRESS.
             // 발행은 커밋 뒤 executor 스레드에서 하므로(NonVerbalJobPublisher) 잠깐 기다린다
-            speechService.requestNonVerbalAnalysis(speech.getId());
+            speechService.requestNonVerbalAnalysis(speech.getId(), speech.getUser().getId());
             List<MapRecord<String, Object, Object>> records = List.of();
             for (int i = 0; i < 50 && records.isEmpty(); i++) {
                 Thread.sleep(100);

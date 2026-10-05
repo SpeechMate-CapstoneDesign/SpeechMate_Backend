@@ -8,6 +8,8 @@ import com.example.speechmate_backend.speech.controller.dto.TranscriptionRespons
 import com.example.speechmate_backend.speech.domain.Speech;
 import com.example.speechmate_backend.speech.domain.converter.VerbalAnalysisConverter;
 import com.example.speechmate_backend.speech.service.SpeechAnalysisResultService;
+import com.example.speechmate_backend.common.exception.ReturnZeroException;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,10 +25,12 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.same;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 
 /** STT 결과 → 대본·어절/음절 수·침묵 구간·간투어 집계. 외부 호출 없는 순수 계산. */
@@ -103,5 +107,16 @@ class VerbalAnalyzeTest {
                 .containsEntry("음", List.of(0, 600))
                 .containsEntry("그", List.of(200))
                 .doesNotContainKey("발표를");
+    }
+
+    @Test
+    @DisplayName("분석 결과 저장 중 직렬화가 실패하면 STT 파이프라인 예외(ReturnZeroException)로 나간다")
+    void serialization_failure_becomes_domain_exception() throws Exception {
+        TranscriptionResponse tr = new TranscriptionResponse("id", "completed", new Results(List.of(
+                new Utterance(0, 100, 0, "s", List.of(w(0, 100, "말")), "말")), true));
+        doThrow(new JsonProcessingException("x") {}).when(converter)
+                .saveAnalysis(org.mockito.ArgumentMatchers.any(), anyLong(), anyLong(), anyList(), anyMap());
+
+        assertThatThrownBy(() -> service.verbalanalyze(new Speech(), tr)).isInstanceOf(ReturnZeroException.class);
     }
 }

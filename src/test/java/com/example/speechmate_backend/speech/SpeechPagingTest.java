@@ -4,6 +4,10 @@ import com.example.speechmate_backend.s3.service.S3UploadPresignedUrlService;
 import com.example.speechmate_backend.speech.controller.dto.SpeechPagingResponseDto;
 import com.example.speechmate_backend.speech.domain.AnalysisResult;
 import com.example.speechmate_backend.speech.domain.Speech;
+import com.example.speechmate_backend.speech.controller.SortType;
+import com.example.speechmate_backend.speech.controller.dto.SpeechFeedDto;
+import com.example.speechmate_backend.speech.controller.dto.SpeechPagingFeedDto;
+import com.example.speechmate_backend.speech.repository.SpeechCustomRepository;
 import com.example.speechmate_backend.speech.repository.SpeechRepository;
 import com.example.speechmate_backend.speech.service.SpeechService;
 import org.junit.jupiter.api.DisplayName;
@@ -29,6 +33,7 @@ class SpeechPagingTest {
 
     @Mock SpeechRepository speechRepository;
     @Mock S3UploadPresignedUrlService s3UploadPresignedUrlService;
+    @Mock SpeechCustomRepository speechCustomRepository;
     @InjectMocks SpeechService speechService;
 
     private static Speech speech(long id, boolean analyzed) {
@@ -93,5 +98,23 @@ class SpeechPagingTest {
         assertThat(page.speeches()).extracting("speechId").containsExactly(4L);
         assertThat(page.hasNext()).isTrue();
         assertThat(page.cursordto().id()).isEqualTo(4L);
+    }
+
+    private static SpeechFeedDto feed(long id) {
+        return new SpeechFeedDto(id, "t" + id, LocalDateTime.of(2026, 10, 5, 0, 0).plusMinutes(id), 60L, "AUDIO", "key" + id, null, null, null);
+    }
+
+    @Test
+    @DisplayName("피드도 같은 자르기 규칙을 쓰고, 파일 키는 공개 URL로 바꿔 돌려준다")
+    void feed_slices_and_resolves_urls() {
+        when(speechCustomRepository.findMyFeed(1L, null, 3, SortType.LATEST)).thenReturn(List.of(feed(9), feed(8), feed(7)));
+        when(s3UploadPresignedUrlService.getPublicS3Url(any())).thenAnswer(inv -> "https://cdn/" + inv.getArgument(0));
+
+        SpeechPagingFeedDto page = speechService.getMySpeecheFeed(1L, null, 2, SortType.LATEST);
+
+        assertThat(page.speeches()).extracting(SpeechFeedDto::id).containsExactly(9L, 8L);
+        assertThat(page.speeches().get(0).fileUrl()).isEqualTo("https://cdn/key9");
+        assertThat(page.hasNext()).isTrue();
+        assertThat(page.cursordto().id()).isEqualTo(8L);
     }
 }

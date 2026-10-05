@@ -3,6 +3,8 @@ package com.example.speechmate_backend.speech;
 import com.example.speechmate_backend.common.exception.SpeechNotFoundException;
 import com.example.speechmate_backend.common.exception.UserNotMatchException;
 import com.example.speechmate_backend.s3.service.S3UploadPresignedUrlService;
+import com.example.speechmate_backend.speech.controller.dto.SpeechMetadataRequestDto;
+import com.example.speechmate_backend.speech.domain.AnalysisResult;
 import com.example.speechmate_backend.speech.domain.Speech;
 import com.example.speechmate_backend.speech.repository.SpeechRepository;
 import com.example.speechmate_backend.speech.service.SpeechService;
@@ -15,11 +17,13 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
@@ -98,6 +102,25 @@ class SpeechOwnershipTest {
         }
         verify(speechRepository, never()).save(any());
         verify(speechRepository, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("본인 요청은 조회·분석·메타데이터 수정 전부 통과한다")
+    void owner_passes_every_read_and_update_path() {
+        Speech speech = speechOwnedBy(OWNER_ID);
+        ReflectionTestUtils.setField(speech, "createdAt", LocalDateTime.of(2026, 10, 5, 0, 0));
+        speech.setContent("대본");
+        speech.setAnalysisResult(AnalysisResult.builder().summary("요약").build());
+
+        assertThat(speechService.analyze(1L, OWNER_ID).summary()).isEqualTo("요약"); // 이미 분석됨 → 저장된 결과 반환
+        assertThat(speechService.getSpeechById(1L, OWNER_ID).sttContent()).isEqualTo("대본");
+        assertThat(speechService.getSpeechContentById(1L, OWNER_ID).content()).isEqualTo("대본");
+        assertThat(speechService.getSpeechConfigById(1L, OWNER_ID).createdAt()).startsWith("2026-10-05");
+        assertThat(speechService.getSpeechContentAnalysisById(1L, OWNER_ID).summary()).isEqualTo("요약");
+        assertThat(speechService.getSpeechVerbalAnalysisById(1L, OWNER_ID)).isNull(); // 언어 분석 전이면 null
+
+        speechService.addMetadataToSpeech(1L, new SpeechMetadataRequestDto("제목", null, null, null), OWNER_ID);
+        assertThat(speech.getTitle()).isEqualTo("제목");
     }
 
     @Test

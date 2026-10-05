@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 import java.util.concurrent.TimeUnit;
 
 @RequiredArgsConstructor
@@ -48,7 +48,8 @@ public class RedisUtil {
         String key = "upload:" + userId + ":" + LocalDate.now();
         Long count = redisTemplate.opsForValue().increment(key);
         if(count == 1) {
-            long ttl = Duration.between(LocalDateTime.now(), LocalDate.now().plusDays(1).atStartOfDay()).getSeconds();
+            ZonedDateTime now = ZonedDateTime.now();
+            long ttl = Duration.between(now, now.toLocalDate().plusDays(1).atStartOfDay(now.getZone())).getSeconds();
             redisTemplate.expire(key, ttl, TimeUnit.SECONDS);
         }
         if(count > 5) {

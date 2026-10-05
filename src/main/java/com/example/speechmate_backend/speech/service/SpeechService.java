@@ -1,6 +1,5 @@
 package com.example.speechmate_backend.speech.service;
 
-import com.example.speechmate_backend.common.ApiResponse;
 import com.example.speechmate_backend.common.aop.DistributedLock;
 import com.example.speechmate_backend.common.exception.*;
 import com.amazonaws.services.s3.model.AmazonS3Exception;
@@ -12,7 +11,6 @@ import com.example.speechmate_backend.s3.repository.PendingUploadRepository;
 import com.example.speechmate_backend.s3.service.S3UploadPresignedUrlService;
 import com.example.speechmate_backend.speech.AnalysisStatus;
 import com.example.speechmate_backend.speech.controller.SortType;
-import com.example.speechmate_backend.speech.controller.SpeechRestClient;
 import com.example.speechmate_backend.speech.controller.dto.*;
 import com.example.speechmate_backend.speech.domain.AnalysisResult;
 import com.example.speechmate_backend.speech.domain.NonVerbalAnalysisResult;
@@ -27,18 +25,16 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -52,7 +48,6 @@ public class SpeechService {
     private final S3UploadPresignedUrlService s3UploadPresignedUrlService;
     private final SpeechRepository speechRepository;
     private final SpeechAnalysisResultService speechAnalysisResultService;
-    private final SpeechRestClient speechRestClient;
     private final SpeechCustomRepository speechCustomRepository;
     private final ReturnZeroClient returnZeroClient;
     private final RedisUtil redisUtil;
@@ -60,18 +55,22 @@ public class SpeechService {
     private final ApplicationEventPublisher eventPublisher;
     private final PendingUploadRepository pendingUploadRepository;
 
-    @Value("${spring.ai.openai.api-key}")
-    private String openAiApiKey;
-
-    @Transactional
-    public AnalysisResultDto analyze(Long speechId) {
+    /** speechId의 스피치를 userId 소유인 경우에만 돌려준다. 남의 speechId로 조회·분석·삭제하는 IDOR 차단. */
+    private Speech findOwnedSpeech(Long speechId, Long userId) {
         Speech speech = speechRepository.findById(speechId)
                 .orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
+        if (!Objects.equals(speech.getUser().getId(), userId)) {
+            throw UserNotMatchException.EXCEPTION;
+        }
+        return speech;
+    }
+
+    @Transactional
+    public AnalysisResultDto analyze(Long speechId, Long userId) {
+        Speech speech = findOwnedSpeech(speechId, userId);
 
         if (speech.getAnalysisResult() != null) {
-            AnalysisResult res = speech.getAnalysisResult();
-            String fileUrl = s3UploadPresignedUrlService.getPublicS3Url(speech.getFileUrl());
-            return AnalysisResultDto.from(res);
+            return AnalysisResultDto.from(speech.getAnalysisResult());
             //throw SpeechContentAlreadyExistException.EXCEPTION; // 이미 분석된 경우 종료
         }
 
@@ -85,7 +84,6 @@ public class SpeechService {
             AnalysisResult result = speechAnalysisResultService.analyzeText(speech, speech.getContent());
             speech.setAnalysisResult(result);
             speechRepository.save(speech);
-            String fileUrl = s3UploadPresignedUrlService.getPublicS3Url(speech.getFileUrl());
             //log.info("[AI 분석 성공] Speech ID {} 논리 점수: {}", speechId, result.getLogicalCoherenceScore());
             return AnalysisResultDto.from(result);
         } catch (Exception e) {
@@ -96,10 +94,9 @@ public class SpeechService {
     }
 
     @DistributedLock(key = "'SPEECH_TRANSCRIBE:' + #speechId")
-    public SpeechSentenceResponse rtzrStt(Long speechId) {
+    public SpeechSentenceResponse rtzrStt(Long speechId, Long userId) {
+        Speech speech = findOwnedSpeech(speechId, userId); // 404/403은 아래 catch에 먹히지 않게 밖에서
         try {
-            Speech speech = speechRepository.findById(speechId)
-                    .orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
 
             TranscriptionResponse transcriptionResponse;
             String rawJson = speech.getRawTranscription();
@@ -194,126 +191,6 @@ public class SpeechService {
             throw ReturnZeroException.EXCEPTION;
         }
 
-    }
-
-    //테스트용
-    public void testrtzrStt(String rtzrId) {
-        try {
-
-            String transcriptionResponse = returnZeroClient.testrtzrTranscription(rtzrId);
-            //speechAnalysisResultService.verbalanalyze(transcriptionResponse);
-            System.out.println(transcriptionResponse);
-        } catch (Exception e) {
-            throw ReturnZeroException.EXCEPTION;
-        }
-
-    }
-
-    public ResponseEntity<ApiResponse<String>> callWhisperStt(MultipartFile file, Long speechId) {
-        Speech speech = speechRepository.findById(speechId)
-                .orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
-        if (speech.getContent() != null && !speech.getContent().isEmpty()) {
-            throw SpeechContentAlreadyExistException.EXCEPTION;
-        }
-        try {
-            String content = speechRestClient.transcribe(file.getResource());
-            speech.setContent(content);
-            speechRepository.save(speech);
-            return ResponseEntity.ok(ApiResponse.ok("stt변환 성공"));
-        } catch (Exception e) {
-            throw new IllegalStateException("Whisper 호출 실패: " + e.getMessage(), e);
-        }
-    }
-
-
-    public ResponseEntity<ApiResponse<String>> transcribeversion2(MultipartFile file, Long speechId) {
-        try {
-            Speech speech = speechRepository.findById(speechId)
-                    .orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
-            if (speech.getContent() != null && !speech.getContent().isEmpty()) {
-                throw SpeechContentAlreadyExistException.EXCEPTION;
-            }
-
-            // FileSystemResource와 파일명 헤더 포함해서 보내기
-            String content = speechRestClient.transcribeversion2(file);
-            speech.setContent(content);
-            speechRepository.save(speech);
-
-            return ResponseEntity.ok(ApiResponse.ok(content));
-        } catch (Exception e) {
-            throw new RuntimeException("Whisper 변환 실패: " + e.getMessage(), e);
-        }
-    }
-
-    @DistributedLock(key = "'SPEECH_TRANSCRIBE:' + #speechId")
-    public SpeechContentResponse transcribeversionFromS3(Long speechId) {
-        try {
-            Speech speech = speechRepository.findById(speechId)
-                    .orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
-            if (speech.getContent() != null && !speech.getContent().isEmpty()) {
-                return SpeechContentResponse.of(speech.getContent());
-            }
-
-            String fileKeyFromDb = speech.getFileUrl();
-            if (fileKeyFromDb == null || fileKeyFromDb.isEmpty()) {
-                // fileKey가 DB에 없는 경우에 대한 예외 처리
-                throw SpeechFileKeyNotFoundException.EXCEPTION;
-            }
-
-            String content = speechRestClient.transcribeWithFileFromS3(fileKeyFromDb);
-            speech.setContent(content);
-            speechRepository.save(speech);
-
-            return SpeechContentResponse.of(content);
-        } catch (Exception e) {
-            throw new RuntimeException("Whisper 변환 실패: " + e.getMessage(), e);
-        }
-
-    }
-
-    public SpeechContentResponse transcribeversionFromS3WithoutLock(Long speechId) {
-        try {
-            Speech speech = speechRepository.findById(speechId)
-                    .orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
-            if (speech.getContent() != null && !speech.getContent().isEmpty()) {
-                return SpeechContentResponse.of(speech.getContent());
-            }
-
-            String fileKeyFromDb = speech.getFileUrl();
-            if (fileKeyFromDb == null || fileKeyFromDb.isEmpty()) {
-                // fileKey가 DB에 없는 경우에 대한 예외 처리
-                throw SpeechFileKeyNotFoundException.EXCEPTION;
-            }
-
-            String content = speechRestClient.transcribeWithFileFromS3(fileKeyFromDb);
-            speech.setContent(content);
-            speechRepository.save(speech);
-
-            return SpeechContentResponse.of(content);
-        } catch (Exception e) {
-            throw new RuntimeException("Whisper 변환 실패: " + e.getMessage(), e);
-        }
-
-    }
-
-    // mp4 -> mp3 테스트
-    public String testtranscription(Long speechId) {
-        try {
-            Speech speech = speechRepository.findById(speechId)
-                    .orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
-
-
-            String fileKeyFromDb = speech.getFileUrl();
-            if (fileKeyFromDb == null || fileKeyFromDb.isEmpty()) {
-                // fileKey가 DB에 없는 경우에 대한 예외 처리
-                throw SpeechFileKeyNotFoundException.EXCEPTION;
-            }
-
-            return speechRestClient.transcribeLargeFile(fileKeyFromDb);
-
-        } catch (Exception e) {
-            throw new RuntimeException("Whisper 변환 실패: " + e.getMessage(), e);
-        }
     }
 
     @Transactional
@@ -500,12 +377,7 @@ public SpeechPagingFeedDto getMySpeecheFeed(Long userId, Long lastSpeechId, int 
 
 @Transactional
 public SpeechIdDto addMetadataToSpeech(Long speechId, SpeechMetadataRequestDto requestDto, Long userId) {
-    Speech speech = speechRepository.findById(speechId)
-            .orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
-
-    if (!speech.getUser().getId().equals(userId)) {
-        throw UserNotMatchException.EXCEPTION;
-    }
+    Speech speech = findOwnedSpeech(speechId, userId);
 
     speech.updateMetadata(
             requestDto.title(),
@@ -519,8 +391,8 @@ public SpeechIdDto addMetadataToSpeech(Long speechId, SpeechMetadataRequestDto r
 }
 
 
-public SpeechResultDto getSpeechById(Long speechId) {
-    Speech speech = speechRepository.findById(speechId).orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
+public SpeechResultDto getSpeechById(Long speechId, Long userId) {
+    Speech speech = findOwnedSpeech(speechId, userId);
     String s3Url = s3UploadPresignedUrlService.getPublicS3Url(speech.getFileUrl());
 
     SpeechResultDto dto = SpeechResultDto.fromE(speech, s3Url);
@@ -528,23 +400,23 @@ public SpeechResultDto getSpeechById(Long speechId) {
 
 }
 
-public SpeechContentResponse getSpeechContentById(Long speechId) {
-    Speech speech = speechRepository.findById(speechId).orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
+public SpeechContentResponse getSpeechContentById(Long speechId, Long userId) {
+    Speech speech = findOwnedSpeech(speechId, userId);
 
     SpeechContentResponse dto = SpeechContentResponse.of(speech.getContent());
     return dto;
 }
 
-public SpeechConfigDto getSpeechConfigById(Long speechId) {
-    Speech speech = speechRepository.findById(speechId).orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
+public SpeechConfigDto getSpeechConfigById(Long speechId, Long userId) {
+    Speech speech = findOwnedSpeech(speechId, userId);
     String s3Url = s3UploadPresignedUrlService.getPublicS3Url(speech.getFileUrl());
     SpeechConfigDto dto = SpeechConfigDto.from(speech, s3Url);
 
     return dto;
 }
 
-public AnalysisResultDto getSpeechContentAnalysisById(Long speechId) {
-    Speech speech = speechRepository.findById(speechId).orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
+public AnalysisResultDto getSpeechContentAnalysisById(Long speechId, Long userId) {
+    Speech speech = findOwnedSpeech(speechId, userId);
 
 
     return AnalysisResultDto.from(speech.getAnalysisResult());
@@ -552,12 +424,9 @@ public AnalysisResultDto getSpeechContentAnalysisById(Long speechId) {
 }
 
 
+    @Transactional
     public void deleteSpeechById(Long speechId, Long userId) {
-        Speech speech = speechRepository.findById(speechId).orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
-
-        if(speech.getUser().getId() != userId) {
-            throw UserNotMatchException.EXCEPTION;
-        }
+        Speech speech = findOwnedSpeech(speechId, userId);
 
         String fileKey = speech.getFileUrl();
         if (fileKey != null && !fileKey.isEmpty()) {
@@ -569,9 +438,8 @@ public AnalysisResultDto getSpeechContentAnalysisById(Long speechId) {
     }
 
 
-    public VerbalAnalysisDto getSpeechVerbalAnalysisById(Long speechId) {
-
-        Speech speech = speechRepository.findById(speechId).orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
+    public VerbalAnalysisDto getSpeechVerbalAnalysisById(Long speechId, Long userId) {
+        Speech speech = findOwnedSpeech(speechId, userId);
         VerbalAnalysisResult verbalAnalysisResult = speech.getVerbalAnalysisResult();
 
         return VerbalAnalysisDto.from(verbalAnalysisResult);
@@ -593,10 +461,8 @@ public AnalysisResultDto getSpeechContentAnalysisById(Long speechId) {
      * @return 202 (Accepted) 또는 409 (Conflict)
      */
     @Transactional // (상태 조회 및 변경을 위해 트랜잭션 사용)
-    public NonVerbalAnalysisGateResponse requestNonVerbalAnalysis(Long speechId) {
-
-        Speech speech = speechRepository.findById(speechId)
-                .orElseThrow(() -> SpeechNotFoundException.EXCEPTION);
+    public NonVerbalAnalysisGateResponse requestNonVerbalAnalysis(Long speechId, Long userId) {
+        Speech speech = findOwnedSpeech(speechId, userId);
 
         String s3Key = speech.getFileUrl();
         if (s3Key == null || s3Key.isEmpty()) {

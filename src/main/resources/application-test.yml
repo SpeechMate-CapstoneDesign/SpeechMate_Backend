@@ -52,4 +52,4 @@ callback:
   secret: test-callback-secret
 
 ffmpeg:
-  path: /usr/bin/ffmpeg   # SpeechRestClient 빈 생성용 (테스트에서 실제 호출 없음)
+  path: /usr/bin/ffmpeg   # ReturnZeroClient 빈 생성용 (테스트에서 실제 호출 없음)

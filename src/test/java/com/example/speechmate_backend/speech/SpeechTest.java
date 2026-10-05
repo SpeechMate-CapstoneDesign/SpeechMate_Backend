@@ -151,7 +151,7 @@ public class SpeechTest {
             executorService.submit(() -> {
                 long t0 = System.nanoTime();
                 try {
-                    statuses.add(speechService.rtzrStt(speech.getId(), userId).sttStatus());
+                    statuses.add(speechService.rtzrStt(speech.getId(), userId, true).sttStatus());
                 } catch (Exception e) {
                     // 락 대기 초과 등은 무시
                 } finally {
@@ -180,7 +180,7 @@ public class SpeechTest {
         verify(returnZeroClient, times(1)).rtzrSttFromS3(anyString());
 
         // then 3: 완료 뒤 같은 요청은 저장된 문장을 바로 돌려주고 외부 API는 다시 부르지 않는다
-        assertThat(speechService.rtzrStt(speech.getId(), userId).sttStatus()).isEqualTo(AnalysisStatus.COMPLETED);
+        assertThat(speechService.rtzrStt(speech.getId(), userId, true).sttStatus()).isEqualTo(AnalysisStatus.COMPLETED);
         verify(returnZeroClient, times(1)).rtzrSttFromS3(anyString());
     }
 

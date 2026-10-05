@@ -76,14 +76,14 @@ class SpeechServiceExceptionTest {
     @DisplayName("STT 접수: 파일키가 없으면 404이고 아무것도 접수되지 않는다")
     void stt_gate_rejects_missing_file_key() {
         speech.setFileUrl(null);
-        assertThatThrownBy(() -> speechService.rtzrStt(1L, 1L)).isSameAs(SpeechFileKeyNotFoundException.EXCEPTION);
+        assertThatThrownBy(() -> speechService.rtzrStt(1L, 1L, true)).isSameAs(SpeechFileKeyNotFoundException.EXCEPTION);
         verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
 
     @Test
     @DisplayName("STT 접수: 처음이면 IN_PROGRESS로 바꾸고 커밋 뒤 실행될 작업 이벤트를 1건 발행한다")
     void stt_gate_accepts_and_publishes() {
-        SttGateResponse res = speechService.rtzrStt(1L, 1L);
+        SttGateResponse res = speechService.rtzrStt(1L, 1L, true);
 
         assertThat(res.sttStatus()).isEqualTo(AnalysisStatus.IN_PROGRESS);
         assertThat(speech.getSttStatus()).isEqualTo(AnalysisStatus.IN_PROGRESS);
@@ -97,12 +97,20 @@ class SpeechServiceExceptionTest {
     @DisplayName("STT 접수: 진행 중이면 상태만 돌려주고 다시 접수하지 않는다. FAILED면 다시 접수한다")
     void stt_gate_in_progress_and_failed() {
         speech.setSttStatus(AnalysisStatus.IN_PROGRESS);
-        assertThat(speechService.rtzrStt(1L, 1L).sttStatus()).isEqualTo(AnalysisStatus.IN_PROGRESS);
+        assertThat(speechService.rtzrStt(1L, 1L, true).sttStatus()).isEqualTo(AnalysisStatus.IN_PROGRESS);
         verify(eventPublisher, never()).publishEvent(any(Object.class));
 
         speech.setSttStatus(AnalysisStatus.FAILED);
-        assertThat(speechService.rtzrStt(1L, 1L).sttStatus()).isEqualTo(AnalysisStatus.IN_PROGRESS);
+        assertThat(speechService.rtzrStt(1L, 1L, true).sttStatus()).isEqualTo(AnalysisStatus.IN_PROGRESS);
         verify(eventPublisher, times(1)).publishEvent(any(Object.class));
+    }
+
+    @Test
+    @DisplayName("STT 접수: 폴링(retry=false) 중에는 FAILED를 그대로 돌려주고 다시 접수하지 않는다")
+    void stt_gate_polling_does_not_retry_failed() {
+        speech.setSttStatus(AnalysisStatus.FAILED);
+        assertThat(speechService.rtzrStt(1L, 1L, false).sttStatus()).isEqualTo(AnalysisStatus.FAILED);
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
 
     @Test
@@ -113,7 +121,7 @@ class SpeechServiceExceptionTest {
         speech.setVerbalAnalysisResult(verbal);
         when(objectMapper.readValue(anyString(), any(TypeReference.class))).thenReturn(List.of(new SentenceDto(0, "안녕")));
 
-        SttGateResponse res = speechService.rtzrStt(1L, 1L);
+        SttGateResponse res = speechService.rtzrStt(1L, 1L, true);
 
         assertThat(res.sttStatus()).isEqualTo(AnalysisStatus.COMPLETED);
         assertThat(res.sentences()).containsExactly(new SentenceDto(0, "안녕"));
@@ -128,7 +136,7 @@ class SpeechServiceExceptionTest {
         speech.setVerbalAnalysisResult(verbal);
         when(objectMapper.readValue(anyString(), any(TypeReference.class))).thenThrow(new JsonProcessingException("x") {});
 
-        assertThatThrownBy(() -> speechService.rtzrStt(1L, 1L)).isInstanceOf(ReturnZeroException.class);
+        assertThatThrownBy(() -> speechService.rtzrStt(1L, 1L, true)).isInstanceOf(ReturnZeroException.class);
     }
 
     @Test

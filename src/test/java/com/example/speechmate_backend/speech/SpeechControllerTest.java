@@ -74,7 +74,7 @@ class SpeechControllerTest {
         verify(speechService).analyze(SPEECH_ID, USER_ID);
 
         call(HttpMethod.POST, "/api/speech/rtzrstt/" + SPEECH_ID);
-        verify(speechService).rtzrStt(SPEECH_ID, USER_ID);
+        verify(speechService).rtzrStt(SPEECH_ID, USER_ID, true);
 
         call(HttpMethod.POST, "/api/speech/nonverbal/" + SPEECH_ID);
         verify(speechService).requestNonVerbalAnalysis(SPEECH_ID, USER_ID);

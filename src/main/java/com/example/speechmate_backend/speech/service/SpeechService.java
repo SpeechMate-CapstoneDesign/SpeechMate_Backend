@@ -100,17 +100,21 @@ public class SpeechService {
      * STT 접수 게이트. 완료됐으면 저장된 문장을, 진행 중이면 상태만, 아니면 작업을 접수하고 IN_PROGRESS를 돌려준다.
      * 실제 STT(S3 다운로드·ffmpeg·외부 API 폴링)는 커밋 뒤 SttJobRunner가 요청 스레드 밖에서 한다.
      * 분산 락은 "상태 확인 → IN_PROGRESS 전환"을 원자적으로 만들기 위해서만 쥔다. 예전엔 STT가 끝날 때까지(최대 5분) 쥐고 있었다.
+     *
+     * @param retry FAILED 상태를 다시 접수할지. 화면 진입 같은 "의도된 요청"은 true, 진행 중 폴링은 false로 보내
+     *              실패한 작업이 폴링 주기마다 다시 돌지 않게 한다(S3 다운로드·외부 STT 호출이 매번 든다).
      */
     @DistributedLock(key = "'SPEECH_TRANSCRIBE:' + #speechId")
-    public SttGateResponse rtzrStt(Long speechId, Long userId) {
+    public SttGateResponse rtzrStt(Long speechId, Long userId, boolean retry) {
         Speech speech = findOwnedSpeech(speechId, userId);
 
         VerbalAnalysisResult verbal = speech.getVerbalAnalysisResult();
         if (verbal != null && verbal.getSentencesJson() != null && !verbal.getSentencesJson().isEmpty()) {
             return SttGateResponse.completed(readSentences(verbal.getSentencesJson())); // 상태 컬럼 도입 전 데이터도 여기로
         }
-        if (speech.getSttStatus() == AnalysisStatus.IN_PROGRESS) {
-            return SttGateResponse.statusOnly(AnalysisStatus.IN_PROGRESS);
+        if (speech.getSttStatus() == AnalysisStatus.IN_PROGRESS
+                || (speech.getSttStatus() == AnalysisStatus.FAILED && !retry)) {
+            return SttGateResponse.statusOnly(speech.getSttStatus());
         }
         String fileKey = speech.getFileUrl();
         if (fileKey == null || fileKey.isEmpty()) {

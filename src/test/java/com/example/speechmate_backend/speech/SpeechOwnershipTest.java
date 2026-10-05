@@ -87,7 +87,7 @@ class SpeechOwnershipTest {
 
         List<ThrowingCallable> calls = List.of(
                 () -> speechService.analyze(1L, other),
-                () -> speechService.rtzrStt(1L, other),
+                () -> speechService.rtzrStt(1L, other, true),
                 () -> speechService.addMetadataToSpeech(1L, null, other),
                 () -> speechService.getSpeechById(1L, other),
                 () -> speechService.getSpeechConfigById(1L, other),

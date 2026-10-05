@@ -42,13 +42,16 @@ public class SpeechController {
         return ResponseEntity.ok(ApiResponse.ok(dto));
     }
 
-    @Operation(summary = "2. rtzr api (stt)", description = "저장된 s3 파일로부터 stt로변환된 내용을 뽑아냅니다.(1을 먼저 선행하여 s3에 파일 저장후 요청해주세요")
+    @Operation(summary = "2. STT 접수/조회", description = "처음 호출하면 STT를 접수하고 sttStatus=IN_PROGRESS를 돌려줍니다. "
+            + "같은 요청을 다시 보내면 진행 중엔 상태만, 끝나면 COMPLETED와 sentences를 돌려줍니다. "
+            + "FAILED는 retry=true(기본)면 다시 접수되고, 폴링 중에는 retry=false로 보내 FAILED를 그대로 받으세요.")
     @PostMapping(value = "/rtzrstt/{speechId}")
-    public ResponseEntity<ApiResponse<SpeechSentenceResponse>> transcribesRtzr(
+    public ResponseEntity<ApiResponse<SttGateResponse>> transcribesRtzr(
             @Parameter(description = "stt변환을 진행할 speechId", required = true)
             @PathVariable Long speechId,
+            @RequestParam(defaultValue = "true") boolean retry,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        return ResponseEntity.ok(ApiResponse.ok(speechService.rtzrStt(speechId, userDetails.getUserId())));
+        return ResponseEntity.ok(ApiResponse.ok(speechService.rtzrStt(speechId, userDetails.getUserId(), retry)));
     }
 
     @Operation(summary = "1-1. 업로드 완료 콜백", description = "클라이언트가 presigned url로 업로드 완료한 후 콜백 합니다.")

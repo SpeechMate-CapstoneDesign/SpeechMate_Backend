@@ -15,7 +15,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.List;
 import java.util.Optional;
+
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
@@ -70,6 +73,31 @@ class SpeechOwnershipTest {
 
         assertThatThrownBy(() -> speechService.getSpeechContentById(1L, 2L))
                 .isInstanceOf(UserNotMatchException.class);
+    }
+
+    @Test
+    @DisplayName("speechId를 받는 모든 서비스 진입점이 타인 요청을 403으로 막는다")
+    void every_entry_point_rejects_other_user() {
+        speechOwnedBy(OWNER_ID);
+        Long other = 2L;
+
+        List<ThrowingCallable> calls = List.of(
+                () -> speechService.analyze(1L, other),
+                () -> speechService.rtzrStt(1L, other),
+                () -> speechService.addMetadataToSpeech(1L, null, other),
+                () -> speechService.getSpeechById(1L, other),
+                () -> speechService.getSpeechConfigById(1L, other),
+                () -> speechService.getSpeechContentById(1L, other),
+                () -> speechService.getSpeechContentAnalysisById(1L, other),
+                () -> speechService.getSpeechVerbalAnalysisById(1L, other),
+                () -> speechService.requestNonVerbalAnalysis(1L, other),
+                () -> speechService.deleteSpeechById(1L, other)
+        );
+        for (ThrowingCallable call : calls) {
+            assertThatThrownBy(call).isInstanceOf(UserNotMatchException.class);
+        }
+        verify(speechRepository, never()).save(any());
+        verify(speechRepository, never()).delete(any());
     }
 
     @Test

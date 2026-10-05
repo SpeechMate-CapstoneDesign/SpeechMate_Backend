@@ -2,6 +2,8 @@ plugins {
     id 'java'
     id 'org.springframework.boot' version '3.3.4'
     id 'io.spring.dependency-management' version '1.1.6'
+    id 'jacoco'
+    id 'org.sonarqube' version '5.1.0.4882'
 }
 
 group = 'com.example'
@@ -128,4 +130,37 @@ dependencyManagement {
 
 tasks.named('test') {
     useJUnitPlatform()
+    finalizedBy jacocoTestReport
+}
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        xml.required = true   // Sonar가 읽는 형식
+        html.required = true  // build/reports/jacoco/test/html/index.html
+    }
+    // 측정 의미 없는 것 제외: QueryDSL Q클래스, DTO/엔티티(getter 덩어리), 설정, 예외 상수
+    afterEvaluate {
+        classDirectories.setFrom(files(classDirectories.files.collect {
+            fileTree(dir: it, exclude: [
+                '**/Q*.class',
+                '**/dto/**',
+                '**/domain/**',
+                '**/config/**',
+                '**/exception/**',
+                '**/SpeechMateBackendApplication.class'
+            ])
+        }))
+    }
+}
+
+sonar {
+    properties {
+        property 'sonar.projectKey', 'SpeechMate-CapstoneDesign_SpeechMate_Backend'
+        property 'sonar.organization', 'speechmate-capstonedesign'
+        property 'sonar.host.url', 'https://sonarcloud.io'
+        property 'sonar.coverage.jacoco.xmlReportPaths', 'build/reports/jacoco/test/jacocoTestReport.xml'
+        property 'sonar.coverage.exclusions', '**/dto/**,**/domain/**,**/config/**,**/exception/**,**/Q*.java,**/SpeechMateBackendApplication.java'
+        property 'sonar.exclusions', 'build/generated/**'
+    }
 }

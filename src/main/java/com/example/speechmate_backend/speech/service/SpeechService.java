@@ -31,11 +31,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 
@@ -86,10 +88,11 @@ public class SpeechService {
             speechRepository.save(speech);
             //log.info("[AI 분석 성공] Speech ID {} 논리 점수: {}", speechId, result.getLogicalCoherenceScore());
             return AnalysisResultDto.from(result);
+        } catch (SmateException e) {
+            throw e;
         } catch (Exception e) {
-            log.error("[AI 분석 실패] Speech ID {}: {}", speechId, e.getMessage(), e);
-            // 원하면 AI 실패 시 따로 정의된 예외로 던질 수도 있음
-            throw new IllegalStateException("AI 분석 실패: " + e.getMessage(), e);
+            log.error("[AI 분석 실패] Speech ID {}", speechId, e);
+            throw AiAnalysisException.EXCEPTION;
         }
     }
 
@@ -161,7 +164,7 @@ public class SpeechService {
             if (verbalResult == null) {
                 // 이 로직이 실행되면 심각한 오류 (needsNewAnalysis=true일 때 생성되었어야 함)
                 log.error("Speech ID {}: 'sentencesJson' 저장 시점에 VerbalAnalysisResult가 null입니다.", speech.getId());
-                throw new IllegalStateException("VerbalAnalysisResult가 존재하지 않습니다.");
+                throw ReturnZeroException.EXCEPTION;
             }
 
             // ✅ 6. 'sentencesJson' 필드가 비어있을 때만 새로 저장 (불필요한 DB UPDATE 방지)
@@ -183,11 +186,10 @@ public class SpeechService {
             // 7. 최종 응답 반환
             return SpeechSentenceResponse.of(sentences);
 
-        } catch (JsonProcessingException e) {
-            log.error("STT JSON 직렬화/역직렬화 오류 발생", e);
-            throw new RuntimeException("JSON 처리 중 오류가 발생했습니다.", e);
+        } catch (SmateException e) {
+            throw e; // 파일키 없음(404), 용량 초과(400) 등은 자기 코드 그대로 나간다
         } catch (Exception e) {
-            log.error("rtzrStt 처리 중 예외 발생", e);
+            log.error("rtzrStt 처리 중 예외 발생 (Speech ID: {})", speechId, e);
             throw ReturnZeroException.EXCEPTION;
         }
 
@@ -252,128 +254,79 @@ public class SpeechService {
         return SpeechS3CallbackDto.of(speech.getId(), s3Url);
     }
 
-    @Transactional(readOnly = true)
-    public SpeechPagingResponseDto getAnalyzedSpeeches(Long userId, Long lastSpeechId, int limit) {
-        Pageable pageable = PageRequest.of(0, limit + 1); // hasNext 체크용
+    /** limit+1개를 조회해 온 목록을 limit개로 자르고, 다음 페이지 유무와 커서를 계산한다. */
+    private record CursorPage<T>(List<T> rows, boolean hasNext, CursorDto cursor) {}
 
-        List<Speech> speeches = speechRepository.findAnalyzedSpeeches(userId, lastSpeechId, pageable);
-
-        boolean hasNext = speeches.size() > limit;
-        CursorDto cursorDto = null;
-
-        if (hasNext) {
-            Speech nextCursorSpeech = speeches.get(limit-1);
-            cursorDto = new CursorDto(nextCursorSpeech.getCreatedAt(), nextCursorSpeech.getId());
-            speeches.remove(limit);
+    private static <T> CursorPage<T> slice(List<T> rows, int limit, Function<T, CursorDto> cursorOf) {
+        if (rows.size() <= limit) {
+            return new CursorPage<>(rows, false, null);
         }
+        List<T> page = new ArrayList<>(rows.subList(0, limit));
+        return new CursorPage<>(page, true, cursorOf.apply(page.get(limit - 1)));
+    }
 
+    private SpeechAnalysisResponseDto toAnalysisDto(Speech speech) {
+        AnalysisResult ar = speech.getAnalysisResult();
+        return new SpeechAnalysisResponseDto(
+                speech.getId(),
+                speech.getCreatedAt(),
+                s3UploadPresignedUrlService.getPublicS3Url(speech.getFileUrl()),
+                speech.getContent(),
+                ar != null ? ar.getSummary() : null,
+                ar != null ? ar.getKeywords() : null,
+                ar != null ? ar.getImprovementPoints() : Collections.emptyList(),
+                ar != null ? ar.getFeedback() : null,
+                ar != null ? ar.getExpectedQuestions() : Collections.emptyList(),
+                ar != null
+        );
+    }
 
-        List<SpeechAnalysisResponseDto> dtoList = speeches.stream()
-                .map(speech -> {
-                    var ar = speech.getAnalysisResult();
-                    String s3Url = s3UploadPresignedUrlService.getPublicS3Url(speech.getFileUrl());
-                    return new SpeechAnalysisResponseDto(
-                            speech.getId(),
-                            speech.getCreatedAt(),
-                            s3Url,
-                            speech.getContent(),
-                            ar.getSummary(),
-                            ar.getKeywords(),
-                            ar.getImprovementPoints(),
-                            ar.getFeedback(),
-                            ar.getExpectedQuestions(),
-                            true
-                    );
-                })
-                .collect(Collectors.toList());
-
-
+    private SpeechPagingResponseDto toAnalysisPage(List<Speech> speeches, int limit) {
+        CursorPage<Speech> page = slice(speeches, limit, sp -> new CursorDto(sp.getCreatedAt(), sp.getId()));
         return SpeechPagingResponseDto.builder()
-                .speeches(dtoList)
-                .hasNext(hasNext)
-                .cursordto(cursorDto)
+                .speeches(page.rows().stream().map(this::toAnalysisDto).toList())
+                .hasNext(page.hasNext())
+                .cursordto(page.cursor())
                 .build();
     }
 
+    @Transactional(readOnly = true)
+    public SpeechPagingResponseDto getAnalyzedSpeeches(Long userId, Long lastSpeechId, int limit) {
+        Pageable pageable = PageRequest.of(0, limit + 1); // hasNext 판정용으로 1개 더
+        return toAnalysisPage(speechRepository.findAnalyzedSpeeches(userId, lastSpeechId, pageable), limit);
+    }
 
     @Transactional(readOnly = true)
     public SpeechPagingResponseDto getAllSpeeches(Long userId, Long lastSpeechId, int limit) {
-        Pageable pageable = PageRequest.of(0, limit + 1); // hasNext 체크용으로 +1 조회
+        Pageable pageable = PageRequest.of(0, limit + 1);
+        return toAnalysisPage(speechRepository.findAllSpeechesWithAnalysis(userId, lastSpeechId, pageable), limit);
+    }
 
-        List<Speech> speeches = speechRepository.findAllSpeechesWithAnalysis(userId, lastSpeechId, pageable);
+    @Transactional(readOnly = true)
+    public SpeechPagingFeedDto getMySpeecheFeed(Long userId, Long lastSpeechId, int limit, SortType sortType) {
+        List<SpeechFeedDto> rawDtos = speechCustomRepository.findMyFeed(userId, lastSpeechId, limit + 1, sortType);
+        CursorPage<SpeechFeedDto> page = slice(rawDtos, limit, dto -> new CursorDto(dto.createdAt(), dto.id()));
 
-        boolean hasNext = speeches.size() > limit;
-        CursorDto cursorDto = null;
+        List<SpeechFeedDto> processedDtos = page.rows().stream()
+                .map(dto -> new SpeechFeedDto(
+                        dto.id(),
+                        dto.title(),
+                        dto.createdAt(),
+                        dto.duration(),
+                        dto.fileType(),
+                        s3UploadPresignedUrlService.getPublicS3Url(dto.fileUrl()),
+                        dto.presentationContext(),
+                        dto.audience(),
+                        dto.location()
+                ))
+                .toList();
 
-        if (hasNext) {
-            Speech nextCursorSpeech = speeches.get(limit-1);
-            cursorDto = new CursorDto(nextCursorSpeech.getCreatedAt(), nextCursorSpeech.getId());
-            speeches.remove(limit);
-        }
-
-
-        List<SpeechAnalysisResponseDto> dtoList = speeches.stream()
-                .map(speech -> {
-                    var ar = speech.getAnalysisResult();
-                    String s3Url = s3UploadPresignedUrlService.getPublicS3Url(speech.getFileUrl());
-                    return new SpeechAnalysisResponseDto(
-                            speech.getId(),
-                            speech.getCreatedAt(),
-                            s3Url,
-                            speech.getContent(),
-                            ar != null ? ar.getSummary() : null,
-                            ar != null ? ar.getKeywords() : null,
-                            ar != null ? ar.getImprovementPoints() : Collections.emptyList(),
-                            ar != null ? ar.getFeedback() : null,
-                            ar != null ? ar.getExpectedQuestions() : Collections.emptyList(),
-                            ar != null
-                    );
-                })
-                .collect(Collectors.toList());
-
-        return SpeechPagingResponseDto.builder()
-                .speeches(dtoList)
-                .hasNext(hasNext)
-                .cursordto(cursorDto)
+        return SpeechPagingFeedDto.builder()
+                .speeches(processedDtos)
+                .hasNext(page.hasNext())
+                .cursordto(page.cursor())
                 .build();
     }
-
-
-@Transactional(readOnly = true)
-public SpeechPagingFeedDto getMySpeecheFeed(Long userId, Long lastSpeechId, int limit, SortType sortType) {
-    List<SpeechFeedDto> rawDtos = speechCustomRepository.findMyFeed(userId, lastSpeechId, limit + 1, sortType);
-
-    boolean hasNext = rawDtos.size() > limit;
-    CursorDto cursorDto = null;
-
-    // 다음 페이지가 존재할 경우에만 커서 정보를 설정하고, 마지막 초과분 데이터 제거
-    if (hasNext) {
-        SpeechFeedDto nextCursorData = rawDtos.get(limit-1);
-        cursorDto = new CursorDto(nextCursorData.createdAt(), nextCursorData.id());
-        rawDtos.remove(limit);
-    }
-
-    List<SpeechFeedDto> processedDtos = rawDtos.stream()
-            .map(dto -> new SpeechFeedDto(
-                    dto.id(),
-                    dto.title(),
-                    dto.createdAt(),
-                    dto.duration(),
-                    dto.fileType(),
-                    s3UploadPresignedUrlService.getPublicS3Url(dto.fileUrl()),
-                    dto.presentationContext(),
-                    dto.audience(),
-                    dto.location()
-            ))
-            .toList();
-
-
-    return SpeechPagingFeedDto.builder()
-            .speeches(processedDtos)
-            .hasNext(hasNext)
-            .cursordto(cursorDto)
-            .build();
-}
 
 @Transactional
 public SpeechIdDto addMetadataToSpeech(Long speechId, SpeechMetadataRequestDto requestDto, Long userId) {
@@ -513,8 +466,8 @@ public AnalysisResultDto getSpeechContentAnalysisById(Long speechId, Long userId
             return NonVerbalAnalysisGateResponse.statusOnly(AnalysisStatus.IN_PROGRESS);
 
         } catch (JsonProcessingException e) {
-            log.error("Redis Stream 작업 직렬화 실패 (Speech ID: {}): {}", speechId, e.getMessage(), e);
-            throw new RuntimeException("작업 생성 중 오류가 발생했습니다.", e);
+            log.error("Redis Stream 작업 직렬화 실패 (Speech ID: {})", speechId, e);
+            throw NonVerbalAnalysisException.EXCEPTION;
         }
     }
 }

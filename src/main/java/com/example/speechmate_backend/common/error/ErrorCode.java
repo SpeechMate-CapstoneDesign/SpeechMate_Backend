@@ -16,17 +16,17 @@ public enum ErrorCode implements ErrorCodeIfs{
     USER_NOT_FOUND("fail", HttpStatus.SC_NOT_FOUND, "존재하지 않는 유저"),
     SPEECH_CONTENT_ALREADY_EXIST("fail", HttpStatus.SC_CONFLICT, "stt로 변환된 content가 이미 존재."),
     SPEECH_CONTENT_NOT_EXIST("fail", HttpStatus.SC_CONFLICT, "stt로 변환된 content가 존재X"),
-    SPEECH_ANALYSIS_RESULT_ALREADY_EXIST("fail", HttpStatus.SC_CONFLICT, "ai로 분석된 analysisResult가 이미 존재."),
-    SPEECH_FILE_KEY_DOES_NOT_EQUAL("fail", HttpStatus.SC_BAD_REQUEST, "파일 키가 저장된 것과 일치하지 않음"),
     SPEECH_FILE_KEY_NOT_FOUND("fail", HttpStatus.SC_NOT_FOUND, "파일키가 없음"),
-    WHISPER_EXCEPTION("fail", HttpStatus.SC_INTERNAL_SERVER_ERROR, "stt를 받아오는 whisper과정에서 오류 발생"),
     USER_NOT_MATCH("fail", HttpStatus.SC_FORBIDDEN, "현재 로그인 한 유저가 일치하지 않습니다."),
     FILE_TOO_LARGE("fail", HttpStatus.SC_BAD_REQUEST, "파일 크기가 25MB가 넘어갑니다. 작은 파일을 업로드해주세요"),
     FFMPEG_EXCEPTION("fail", HttpStatus.SC_INTERNAL_SERVER_ERROR, "파일 변환 중 오류 발생(ffmpeg)"),
     RETURN_ZERO_EXCEPTION("fail", HttpStatus.SC_INTERNAL_SERVER_ERROR, "ReturnZero stt 과정중 오류 발생"),
     UPLOAD_LIMIT_EXCEED("fail", HttpStatus.SC_TOO_MANY_REQUESTS, "이미 5회 업로드 했습니다."),
     INVALID_FILE_EXTENSION("fail", HttpStatus.SC_BAD_REQUEST, "허용되지 않는 파일 확장자입니다."),
-    LOCK_ACQUISITION_FAILED("fail", HttpStatus.SC_CONFLICT, "동일한 요청이 이미 처리 중입니다. 잠시 후 다시 시도해주세요.");
+    LOCK_ACQUISITION_FAILED("fail", HttpStatus.SC_CONFLICT, "동일한 요청이 이미 처리 중입니다. 잠시 후 다시 시도해주세요."),
+    AI_ANALYSIS_EXCEPTION("fail", HttpStatus.SC_INTERNAL_SERVER_ERROR, "AI 텍스트 분석 중 오류 발생"),
+    NON_VERBAL_ANALYSIS_EXCEPTION("fail", HttpStatus.SC_INTERNAL_SERVER_ERROR, "비언어 분석 요청 처리 중 오류 발생"),
+    INTERNAL_SERVER_ERROR("fail", HttpStatus.SC_INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다.");
 
     private final String status;
     private final Integer resultCode;

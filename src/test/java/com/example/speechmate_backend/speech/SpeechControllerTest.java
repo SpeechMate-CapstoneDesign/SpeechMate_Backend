@@ -1,5 +1,6 @@
 package com.example.speechmate_backend.speech;
 
+import com.example.speechmate_backend.common.exception.SpeechNotFoundException;
 import com.example.speechmate_backend.config.security.JwtUtil;
 import com.example.speechmate_backend.fcm.FirebaseConfig;
 import com.example.speechmate_backend.s3.config.S3Config;
@@ -18,6 +19,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -79,6 +81,30 @@ class SpeechControllerTest {
 
         call(HttpMethod.DELETE, "/api/speech/delete/" + SPEECH_ID);
         verify(speechService).deleteSpeechById(SPEECH_ID, USER_ID);
+    }
+
+    @Test
+    @DisplayName("커스텀 예외는 자기 상태 코드와 공통 봉투로 나간다 (404 스피치 없음)")
+    void smate_exception_keeps_its_status_and_envelope() throws Exception {
+        when(speechService.getSpeechById(SPEECH_ID, USER_ID)).thenThrow(SpeechNotFoundException.EXCEPTION);
+
+        mockMvc.perform(request(HttpMethod.GET, "/api/speech/" + SPEECH_ID).header("Authorization", bearer()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value("fail"))
+                .andExpect(jsonPath("$.resultCode").value(404))
+                .andExpect(jsonPath("$.data").value("존재하지 않는 스피치"));
+    }
+
+    @Test
+    @DisplayName("예상 못 한 예외는 스택 대신 공통 봉투의 500으로 나간다")
+    void unexpected_exception_becomes_plain_500() throws Exception {
+        when(speechService.getSpeechById(SPEECH_ID, USER_ID)).thenThrow(new IllegalStateException("boom"));
+
+        mockMvc.perform(request(HttpMethod.GET, "/api/speech/" + SPEECH_ID).header("Authorization", bearer()))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.status").value("fail"))
+                .andExpect(jsonPath("$.resultCode").value(500))
+                .andExpect(jsonPath("$.data").value("서버 내부 오류가 발생했습니다."));
     }
 
     @Test

@@ -1,5 +1,7 @@
 package com.example.speechmate_backend.speech.returnzero;
 
+import com.example.speechmate_backend.common.exception.ReturnZeroException;
+
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -67,7 +69,7 @@ public class ReturnZeroTokenManager {
                     expireAtTimestamp = Long.parseLong(expireAtObj.toString());
                 } catch (NumberFormatException e) {
                     log.error("ReturnZero 'expire_at' 필드 파싱 실패: {}", expireAtObj);
-                    throw new RuntimeException("ReturnZero 토큰 응답 파싱 실패");
+                    throw ReturnZeroException.EXCEPTION;
                 }
             }
 
@@ -80,7 +82,7 @@ public class ReturnZeroTokenManager {
             log.info("새로운 RTZR 액세스 토큰이 발급되었습니다. 만료 시간: {}", tokenExpiresAt);
         } else {
             log.error("토큰 발급 실패: {}", response);
-            throw new RuntimeException("ReturnZero 토큰 발급 실패");
+            throw ReturnZeroException.EXCEPTION;
         }
     }
 

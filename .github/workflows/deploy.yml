@@ -1,9 +1,8 @@
 name: CI/CD for capstoneback
 
+# 운영 EC2가 내려가 있어 자동 배포는 멈춰 둔다. 서버를 다시 올리면 push 트리거를 복구할 것.
 on:
-  push:
-    branches:
-      - dev
+  workflow_dispatch:
 
 jobs:
   build:

@@ -1,5 +1,7 @@
 package com.example.speechmate_backend.speech.service;
 
+import com.example.speechmate_backend.common.exception.AiAnalysisException;
+import com.example.speechmate_backend.common.exception.ReturnZeroException;
 import com.example.speechmate_backend.speech.controller.dto.AnalysisResultDto;
 import com.example.speechmate_backend.speech.controller.dto.GptResponse;
 import com.example.speechmate_backend.speech.controller.dto.Silence;
@@ -67,7 +69,7 @@ public class SpeechAnalysisResultService {
                 "format", outputParser.getFormat()
         ));
 
-        System.out.println(prompt.getContents());
+        log.debug("GPT 프롬프트: {}", prompt.getContents());
 
 
         ChatClient chatClient = chatClientBuilder.build();
@@ -76,7 +78,7 @@ public class SpeechAnalysisResultService {
         String jsonResponse = chatClient.prompt(prompt)
                 .call()
                 .content();
-        System.out.println("AI 응답: " + jsonResponse);
+        log.debug("GPT 응답: {}", jsonResponse);
 
         // 2. 받은 문자열을 ObjectMapper로 직접 파싱.
         try {
@@ -95,8 +97,8 @@ public class SpeechAnalysisResultService {
 
             return AnalysisResult.from(dto);
         } catch (Exception e) {
-            // 파싱 실패 시 예외 처리
-            throw new RuntimeException("AI 응답 파싱 실패: " + jsonResponse, e);
+            log.error("AI 응답 파싱 실패: {}", jsonResponse, e);
+            throw AiAnalysisException.EXCEPTION;
         }
 
     }
@@ -155,21 +157,10 @@ public class SpeechAnalysisResultService {
         try {
             verbalAnalysisConverter.saveAnalysis(speech, wordCnt, syllableCnt, silenceList, fillerUsage);
         } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
+            log.error("언어 분석 결과 직렬화 실패 (Speech ID: {})", speech.getId(), e);
+            throw ReturnZeroException.EXCEPTION;
         }
 
-        /*log.info("content: {}", con);
-        log.info("음절 수 : {}, 어절 수 : {}", syllableCnt, wordCnt);
-        //System.out.println("침묵 구간: " + silenceList);
-        for(Silence s : silenceList) {
-            System.out.println("침묵 지속시간: " + s.getDuration()+ ", 시작 시간: " + s.getStartTime() + ", 끝 시간: " + s.getEndTime() + ", 시작 단어: " + s.getWordBefore()+ ", 다음 단어: " + s.getWordAfter());
-            System.out.println();
-        }
-
-        for(Map.Entry<String, List<Integer>> f : fillerUsage.entrySet()) {
-            System.out.println("간투어: [" + f.getKey() + "], 타임스탬프: " + f.getValue());
-            System.out.println();
-        }*/
 
 
         return con;

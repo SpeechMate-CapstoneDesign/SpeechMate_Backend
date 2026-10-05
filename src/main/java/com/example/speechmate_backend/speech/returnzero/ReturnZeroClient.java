@@ -4,10 +4,12 @@ import com.amazonaws.services.s3.model.S3Object;
 import com.example.speechmate_backend.common.exception.FFmpegException;
 import com.example.speechmate_backend.common.exception.FileTooLargeException;
 import com.example.speechmate_backend.common.exception.ReturnZeroException;
+import com.example.speechmate_backend.common.exception.SmateException;
 import com.example.speechmate_backend.s3.service.S3UploadPresignedUrlService;
 import com.example.speechmate_backend.speech.controller.dto.TranscriptionResponse;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
@@ -20,8 +22,10 @@ import org.springframework.web.reactive.function.client.WebClient;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStream;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.util.Map;
@@ -38,6 +42,15 @@ public class ReturnZeroClient {
 
     @Value("${ffmpeg.path}")
     private String ffmpegPath;
+
+    // 공용 /tmp 대신 앱 전용 작업 디렉터리에 임시파일을 만든다 (Sonar S5443). 기본값은 홈 아래.
+    @Value("${app.work-dir:${user.home}/.speechmate/work}")
+    private Path workDir;
+
+    @PostConstruct
+    void init() throws IOException {
+        Files.createDirectories(workDir);
+    }
 
     // Use WebClient.Builder to create an instance configured for ReturnZero
     public ReturnZeroClient(WebClient.Builder webClientBuilder, ReturnZeroTokenManager returnZeroTokenManager, ObjectMapper objectMapper, S3UploadPresignedUrlService s3UploadPresignedUrlService) {
@@ -60,7 +73,7 @@ public class ReturnZeroClient {
 
             // 1. 임시 파일로 저장
             String fileExtension = getFileExtension(fileKey);
-            tempVideoFile = File.createTempFile("speech-temp", "." + fileExtension);
+            tempVideoFile = Files.createTempFile(workDir, "speech-temp", "." + fileExtension).toFile();
 
             try (InputStream is = s3Object.getObjectContent()) {
                 Files.copy(is, tempVideoFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
@@ -73,13 +86,13 @@ public class ReturnZeroClient {
                     || "mov".equalsIgnoreCase(fileExtension)
                     || "m4a".equalsIgnoreCase(fileExtension)) {
 
-                tempAudioFile = File.createTempFile("audio-extracted", ".mp3");
+                tempAudioFile = Files.createTempFile(workDir, "audio-extracted", ".mp3").toFile();
                 log.info("ffmpeg 변환 시작");
                 runFfmpegConversion(tempVideoFile, tempAudioFile);
                 log.info("변환 완료. MP3 크기: {} bytes", tempAudioFile.length());
 
             } else {
-                tempAudioFile = File.createTempFile("audio-original", "." + fileExtension);
+                tempAudioFile = Files.createTempFile(workDir, "audio-original", "." + fileExtension).toFile();
                 Files.copy(tempVideoFile.toPath(), tempAudioFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
             }
 
@@ -124,6 +137,8 @@ public class ReturnZeroClient {
 
             log.info("ReturnZero에서 받은 응답(Id): {}", rtzrId);
             return rtzrId;
+        } catch (SmateException e) {
+            throw e; // 파일 용량 초과(400), ffmpeg 실패 등은 자기 코드 그대로
         } catch (Exception e) {
             log.error("ReturnZero Id를 받아오는 중에 오류 발생", e);
             throw ReturnZeroException.EXCEPTION;

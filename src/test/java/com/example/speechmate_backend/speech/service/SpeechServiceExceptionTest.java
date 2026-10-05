@@ -121,6 +121,17 @@ class SpeechServiceExceptionTest {
     }
 
     @Test
+    @DisplayName("STT 접수: 저장된 문장 JSON이 깨져 있으면 ReturnZeroException")
+    void stt_gate_corrupt_sentences_json() throws Exception {
+        VerbalAnalysisResult verbal = new VerbalAnalysisResult();
+        verbal.setSentencesJson("broken");
+        speech.setVerbalAnalysisResult(verbal);
+        when(objectMapper.readValue(anyString(), any(TypeReference.class))).thenThrow(new JsonProcessingException("x") {});
+
+        assertThatThrownBy(() -> speechService.rtzrStt(1L, 1L)).isInstanceOf(ReturnZeroException.class);
+    }
+
+    @Test
     @DisplayName("비언어 분석 요청: 작업 직렬화 실패는 NonVerbalAnalysisException, 상태는 바뀌지 않음")
     void nonverbal_wraps_serialization_failure() throws Exception {
         when(objectMapper.writeValueAsString(any())).thenThrow(new JsonProcessingException("x") {});
